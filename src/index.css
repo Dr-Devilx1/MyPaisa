@@ -1,0 +1,378 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   My Paisa — design tokens + theme system
+   ==========================================================================
+
+   WHY THIS FILE IS LARGE
+   The views were written with the dark palette hard-coded into class names
+   (bg-[#131316], text-white, text-zinc-500, border-zinc-800, text-emerald-400).
+   Three consequences, all reported:
+
+     1. Dark text on dark backgrounds. Some cards set a dark surface but left
+        text at a dark zinc value, so it was unreadable — in a few places the
+        text and the card were within a few percent of the same luminance.
+     2. Icons vanished in light mode. Accent icons used the -400 weight, which
+        is designed for dark backgrounds. On white it drops to roughly 1.9:1
+        contrast, i.e. barely visible.
+     3. Nothing responded to the theme toggle unless a view happened to check
+        `isDark` — only about half of them did.
+
+   Rewriting ~7,000 lines of JSX was not the right trade. Instead the palette is
+   defined once as tokens, and the hard-coded utilities are remapped underneath
+   `.theme-light`. One file to maintain, and it corrects every view uniformly
+   whether or not it reads the theme flag.
+   ========================================================================== */
+
+:root {
+  color-scheme: dark;
+
+  /* Brand — sampled from the My Paisa logo */
+  --brand:        #FF751F;
+  --brand-light:  #FFA629;
+  --brand-deep:   #E85D0A;
+  --brand-ink:    #1A0A00;   /* text placed on top of --brand */
+
+  /* Semantic (finance meaning, deliberately not brand-coloured) */
+  --pos:          #22C55E;   /* income / gains  */
+  --neg:          #F43F5E;   /* expense / loss  */
+  --warn:         #F59E0B;
+  --info:         #3B82F6;
+
+  /* Dark surfaces */
+  --bg:           #0A0A0F;
+  --surface:      #14141B;
+  --surface-2:    #1C1C25;
+  --surface-3:    #262631;
+  --border:       #2A2A36;
+  --border-soft:  #21212B;
+
+  /* Dark text — each step tested to clear 4.5:1 on --surface */
+  --text:         #F7F7F9;
+  --text-2:       #B4B4C0;
+  --text-3:       #8A8A99;
+
+  --radius:       1.25rem;
+  --radius-lg:    1.75rem;
+
+  --safe-top:     env(safe-area-inset-top, 0px);
+  --safe-bottom:  env(safe-area-inset-bottom, 0px);
+
+  /* Height of the on-screen keyboard; set from JS. */
+  --kb: 0px;
+}
+
+.theme-light {
+  color-scheme: light;
+
+  --bg:           #F4F5F7;
+  --surface:      #FFFFFF;
+  --surface-2:    #F7F8FA;
+  --surface-3:    #EDEFF3;
+  --border:       #E3E6EB;
+  --border-soft:  #EFF1F4;
+
+  --text:         #14161A;
+  --text-2:       #4A5060;
+  --text-3:       #6B7280;
+
+  --brand-ink:    #FFFFFF;
+}
+
+/* ==========================================================================
+   Base
+   ========================================================================== */
+
+html, body, #root {
+  min-height: 100%;
+  background-color: var(--bg);
+}
+
+body {
+  margin: 0;
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+  /* Stops iOS/Android zooming the layout when a field is focused. */
+  text-size-adjust: 100%;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Never let a long unbroken string (a note, an email) blow out a card. */
+h1, h2, h3, h4, p, span, div, button, label {
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+/* ==========================================================================
+   THE "TEXT GOES VERTICAL" BUG
+   A flex or grid child with no explicit min-width defaults to its content's
+   min-content size. Combined with word-break: break-word above (which lets a
+   long, unbreakable string shrink its min-content size all the way down),
+   flexbox/grid would squeeze a title or an amount down to a single character
+   wide whenever its siblings (an icon, another column) needed the room —
+   which rendered as one letter per line, stacked vertically. Every flex/grid
+   child now defaults to min-width: 0, so wrap/truncate/clamp utilities
+   actually take effect instead of being overridden by that automatic floor.
+   ========================================================================== */
+.flex > *, .inline-flex > *, .grid > * { min-width: 0; }
+
+/* Inputs below 16px make Android and iOS zoom the viewport on focus, which is
+   the "layout jumps when I start typing" problem. 16px is the floor. */
+input, select, textarea {
+  font-size: 16px !important;
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+
+select option { background-color: var(--surface-2); color: var(--text); }
+
+/* ==========================================================================
+   Typography floor
+   Several labels were set at 10-11px, which is below the practical legibility
+   limit on a phone. These raise the floor without touching layout.
+   ========================================================================== */
+
+.text-\[9px\]  { font-size: 11px !important; }
+.text-\[10px\] { font-size: 11.5px !important; }
+.text-\[11px\] { font-size: 12.5px !important; }
+.text-xs       { font-size: 13px !important; line-height: 1.45 !important; }
+.text-sm       { font-size: 14.5px !important; line-height: 1.5 !important; }
+
+/* Tracking-widest at tiny sizes shreds readability. */
+.tracking-\[0\.28em\], .tracking-\[0\.2em\] { letter-spacing: 0.12em !important; }
+
+/* ==========================================================================
+   Responsive shell — phone, large phone, tablet, desktop
+   ========================================================================== */
+
+.mp-shell {
+  width: 100%;
+  margin-inline: auto;
+  padding-inline: 1rem;
+  max-width: 100%;
+}
+@media (min-width: 480px) { .mp-shell { padding-inline: 1.25rem; } }
+@media (min-width: 768px) { .mp-shell { max-width: 720px; padding-inline: 1.5rem; } }
+@media (min-width: 1024px){ .mp-shell { max-width: 960px; } }
+@media (min-width: 1280px){ .mp-shell { max-width: 1120px; } }
+
+.mp-safe-top    { padding-top: var(--safe-top); }
+.mp-safe-bottom { padding-bottom: var(--safe-bottom); }
+
+/* ==========================================================================
+   Keyboard handling
+   The bottom navigation is fixed. When the soft keyboard opens, Android resizes
+   the viewport and the bar was being pushed up to sit directly on top of the
+   keyboard, covering the field being typed into. `.mp-kb-open` is set from JS
+   (see src/lib/useKeyboard.ts) and hides it for the duration.
+   ========================================================================== */
+
+.mp-kb-open .mp-bottom-nav { transform: translateY(140%); pointer-events: none; }
+.mp-bottom-nav { transition: transform 180ms ease; }
+.mp-kb-open .mp-kb-hide { display: none !important; }
+
+/* ==========================================================================
+   Modal shell — fixed header and footer, scrollable body
+   The report was "no close & done option is showing". The modals used
+   `overflow-hidden` on the outer panel with the action buttons at the bottom of
+   the scrolling content, so on a short screen the buttons were clipped away
+   entirely with no way to reach them.
+   ========================================================================== */
+
+.mp-modal-wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+}
+@media (min-width: 640px) {
+  .mp-modal-wrap { align-items: center; padding: 1.5rem; }
+}
+
+.mp-modal {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 560px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 1.5rem 1.5rem 0 0;
+  /* Leaves room for the status bar, and shrinks as the keyboard grows. */
+  max-height: calc(100dvh - var(--safe-top) - 12px - var(--kb));
+  overflow: hidden;
+}
+@media (min-width: 640px) {
+  .mp-modal { border-radius: 1.5rem; max-height: min(86dvh, 760px); }
+}
+
+.mp-modal-head,
+.mp-modal-foot { flex: 0 0 auto; background: var(--surface); }
+.mp-modal-head { border-bottom: 1px solid var(--border-soft); }
+.mp-modal-foot {
+  border-top: 1px solid var(--border-soft);
+  padding-bottom: calc(0.875rem + var(--safe-bottom));
+}
+.mp-modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* ==========================================================================
+   Scrollbars
+   ========================================================================== */
+
+.mp-modal-body::-webkit-scrollbar, .overflow-y-auto::-webkit-scrollbar { width: 6px; }
+.mp-modal-body::-webkit-scrollbar-thumb, .overflow-y-auto::-webkit-scrollbar-thumb {
+  background: var(--border); border-radius: 3px;
+}
+
+/* ==========================================================================
+   LIGHT THEME REMAP
+   Everything below rewrites the hard-coded dark utilities. Specificity is
+   0-2-0 against Tailwind's 0-1-0, so no !important is needed except where a
+   Tailwind variant also carries a pseudo-class.
+   ========================================================================== */
+
+/* --- surfaces ------------------------------------------------------------ */
+.theme-light .bg-\[\#09090B\],
+.theme-light .bg-\[\#09090B\]\/90,
+.theme-light .bg-\[\#0A0A0F\]      { background-color: #F4F5F7 !important; }
+.theme-light .bg-\[\#131316\],
+.theme-light .bg-\[\#14141B\]      { background-color: #FFFFFF !important; }
+.theme-light .bg-zinc-950          { background-color: #EDEFF3 !important; }
+.theme-light .bg-zinc-900,
+.theme-light .bg-zinc-900\/80,
+.theme-light .bg-zinc-900\/70,
+.theme-light .bg-zinc-900\/60,
+.theme-light .bg-zinc-900\/50,
+.theme-light .bg-zinc-900\/40      { background-color: #F7F8FA !important; }
+.theme-light .bg-zinc-800,
+.theme-light .bg-zinc-800\/60,
+.theme-light .bg-zinc-800\/50      { background-color: #EDEFF3 !important; }
+.theme-light .bg-black,
+.theme-light .bg-black\/60,
+.theme-light .bg-black\/50         { background-color: rgba(15,23,42,0.45) !important; }
+
+.theme-light .hover\:bg-zinc-800:hover,
+.theme-light .hover\:bg-zinc-800\/60:hover { background-color: #EDEFF3 !important; }
+.theme-light .hover\:bg-zinc-900:hover     { background-color: #F4F5F7 !important; }
+.theme-light .active\:bg-zinc-800:active   { background-color: #E3E6EB !important; }
+
+/* --- borders ------------------------------------------------------------- */
+.theme-light .border-zinc-800,
+.theme-light .border-zinc-800\/80,
+.theme-light .border-zinc-800\/50  { border-color: #E3E6EB !important; }
+.theme-light .border-zinc-900      { border-color: #EFF1F4 !important; }
+.theme-light .border-zinc-700      { border-color: #CBD2DA !important; }
+.theme-light .hover\:border-zinc-700:hover { border-color: #CBD2DA !important; }
+.theme-light .divide-zinc-800 > * + * { border-color: #E3E6EB !important; }
+
+/* --- text ---------------------------------------------------------------- */
+.theme-light .text-white,
+.theme-light .text-zinc-100 { color: #14161A !important; }
+.theme-light .text-zinc-200 { color: #1F2430 !important; }
+.theme-light .text-zinc-300 { color: #333A48 !important; }
+.theme-light .text-zinc-400 { color: #4A5060 !important; }
+.theme-light .text-zinc-500 { color: #5A6173 !important; }
+.theme-light .text-zinc-600,
+.theme-light .text-zinc-700 { color: #6B7280 !important; }
+
+.theme-light .hover\:text-white:hover,
+.theme-light .hover\:text-zinc-200:hover { color: #14161A !important; }
+.theme-light .placeholder-zinc-600::placeholder,
+.theme-light .placeholder-zinc-500::placeholder { color: #9AA1AE !important; }
+
+/* --- ACCENT ICONS IN LIGHT MODE -----------------------------------------
+   This is the "icons are merged with bg colour" fault. The -400 weights are
+   tuned for dark surfaces; on white they fall to roughly 1.9:1 contrast.
+   Stepping them to -600 brings each one above 4.5:1.
+   ------------------------------------------------------------------------ */
+.theme-light .text-emerald-400, .theme-light .text-emerald-500 { color: #047857 !important; }
+.theme-light .text-green-400,   .theme-light .text-green-500   { color: #15803D !important; }
+.theme-light .text-rose-400,    .theme-light .text-rose-500    { color: #BE123C !important; }
+.theme-light .text-red-400,     .theme-light .text-red-500     { color: #B91C1C !important; }
+.theme-light .text-amber-400,   .theme-light .text-amber-500   { color: #B45309 !important; }
+.theme-light .text-yellow-400,  .theme-light .text-yellow-500  { color: #A16207 !important; }
+.theme-light .text-cyan-400,    .theme-light .text-cyan-500    { color: #0E7490 !important; }
+.theme-light .text-blue-400,    .theme-light .text-blue-500    { color: #1D4ED8 !important; }
+.theme-light .text-indigo-400,  .theme-light .text-indigo-500  { color: #C2410C !important; }
+.theme-light .text-violet-400,  .theme-light .text-violet-500  { color: #6D28D9 !important; }
+.theme-light .text-purple-400,  .theme-light .text-purple-500  { color: #7E22CE !important; }
+.theme-light .text-orange-400,  .theme-light .text-orange-500  { color: #C2410C !important; }
+.theme-light .text-pink-400,    .theme-light .text-pink-500    { color: #BE185D !important; }
+.theme-light .text-teal-400,    .theme-light .text-teal-500    { color: #0F766E !important; }
+.theme-light .text-sky-400,     .theme-light .text-sky-500     { color: #0369A1 !important; }
+.theme-light .text-lime-400                                    { color: #4D7C0F !important; }
+.theme-light .text-fuchsia-400                                 { color: #A21CAF !important; }
+
+/* Tinted chips stay legible on white. */
+.theme-light [class*="/10"], .theme-light [class*="/20"] { --tw-bg-opacity: 1; }
+
+.theme-light .shadow-xl, .theme-light .shadow-2xl {
+  box-shadow: 0 10px 30px -12px rgba(20, 22, 26, 0.14) !important;
+}
+
+/* ==========================================================================
+   BRAND REMAP — indigo was the previous primary accent; the logo is orange.
+   Positive/negative money colours are deliberately left green/red.
+   ========================================================================== */
+
+.bg-indigo-600  { background-color: var(--brand) !important; }
+.bg-indigo-500  { background-color: var(--brand-light) !important; }
+.hover\:bg-indigo-500:hover { background-color: var(--brand-light) !important; }
+.hover\:bg-indigo-600:hover { background-color: var(--brand-deep) !important; }
+.border-indigo-500\/30 { border-color: rgba(255,117,31,0.32) !important; }
+.bg-indigo-500\/10 { background-color: rgba(255,117,31,0.12) !important; }
+.bg-indigo-500\/20 { background-color: rgba(255,117,31,0.20) !important; }
+.text-indigo-400 { color: var(--brand-light) !important; }
+
+/* ==========================================================================
+   Utilities used by the rebuilt views
+   ========================================================================== */
+
+.mp-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+.mp-inset {
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+}
+.mp-text   { color: var(--text); }
+.mp-text-2 { color: var(--text-2); }
+.mp-text-3 { color: var(--text-3); }
+
+.mp-brand-bg { background: linear-gradient(135deg, var(--brand-light), var(--brand)); }
+.mp-brand-fg { color: var(--brand); }
+
+/* Tabular figures stop money columns jittering as digits change. A money
+   amount is one unit and must never wrap or get squeezed into a single
+   stacked-vertical column — see the note above on the "text goes vertical"
+   bug for why a bare min-width: 0 isn't enough on its own. */
+.mp-num { font-variant-numeric: tabular-nums; letter-spacing: -0.01em; white-space: nowrap; }
+
+/* Truncation helpers for long names in list rows. */
+.mp-clamp-1 { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+.mp-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* Minimum touch target — several icon buttons were under 32px. */
+.mp-tap { min-width: 44px; min-height: 44px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

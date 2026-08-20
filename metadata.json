@@ -1,0 +1,6 @@
+{
+  "name": "MoneyPilot",
+  "description": "MoneyPilot (MP) - Your Personal AI Financial Assistant developed by SIHFZ. Feature-rich offline-first personal financial manager with AI advice, budget tracking, transaction management, and reports.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

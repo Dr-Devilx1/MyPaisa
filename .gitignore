@@ -1,0 +1,14 @@
+node_modules
+dist
+.env
+.env.local
+*.log
+
+# Capacitor generates this; recreate with `npm run android:add`
+android/
+ios/
+
+# Signing keys — never commit these
+*.jks
+*.keystore
+*.jks.b64
