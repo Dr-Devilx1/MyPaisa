@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useFinancials } from '../state/FinancialContext';
 import { TransactionType, MainCategory } from '../types';
+import { compressImageFile } from '../lib/image';
 import {
   X,
   ArrowUpRight,
@@ -10,7 +11,10 @@ import {
   Tag,
   Plus,
   BookmarkCheck,
-  HeartHandshake
+  HeartHandshake,
+  Camera,
+  Receipt,
+  ImageOff
 } from 'lucide-react';
 
 interface AddTransactionModalProps {
@@ -73,6 +77,30 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
   const [tags, setTags] = useState('');
   const [error, setError] = useState('');
 
+  const [showTaxBreakdown, setShowTaxBreakdown] = useState(false);
+  const [baseAmount, setBaseAmount] = useState('');
+  const [taxFeeAmount, setTaxFeeAmount] = useState('');
+
+  const [receiptImage, setReceiptImage] = useState('');
+  const [imageError, setImageError] = useState('');
+  const [isCompressing, setIsCompressing] = useState(false);
+
+  const handlePickImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setImageError('');
+    setIsCompressing(true);
+    try {
+      const dataUrl = await compressImageFile(file);
+      setReceiptImage(dataUrl);
+    } catch {
+      setImageError('Could not attach that photo — try a different one.');
+    } finally {
+      setIsCompressing(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   const handleMainCatChange = (cat: MainCategory) => {
@@ -119,6 +147,9 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
       });
     }
 
+    const parsedBase = parseFloat(baseAmount);
+    const parsedTax = parseFloat(taxFeeAmount);
+
     addTransaction({
       title,
       amount: numAmount,
@@ -130,6 +161,9 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
       date: new Date(date).toISOString(),
       paymentMethod,
       accountId: accountId || undefined,
+      baseAmount: Number.isFinite(parsedBase) && parsedBase > 0 ? parsedBase : undefined,
+      taxFeeAmount: Number.isFinite(parsedTax) && parsedTax > 0 ? parsedTax : undefined,
+      receiptImage: receiptImage || undefined,
       notes,
       tags: tags
         .split(',')
@@ -145,6 +179,11 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
     setPersonName('');
     setCustomCatTitle('');
     setAccountId('');
+    setShowTaxBreakdown(false);
+    setBaseAmount('');
+    setTaxFeeAmount('');
+    setReceiptImage('');
+    setImageError('');
     onClose();
   };
 
@@ -295,6 +334,64 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Optional breakdown: what the item actually cost vs. tax/fee on top */}
+          {(type === 'income' || type === 'expense') && (
+            <div>
+              {!showTaxBreakdown ? (
+                <button
+                  type="button"
+                  onClick={() => setShowTaxBreakdown(true)}
+                  className="flex items-center gap-1.5 text-[11px] font-bold text-zinc-500 hover:text-zinc-300"
+                >
+                  <Receipt className="h-3.5 w-3.5" /> + Add tax / fee breakdown (optional)
+                </button>
+              ) : (
+                <div className={`rounded-xl border p-3 flex flex-col gap-2 ${isDark ? 'border-zinc-800 bg-zinc-900/60' : 'border-zinc-200 bg-zinc-50'}`}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-zinc-500">Actual price vs. tax/fee charged</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowTaxBreakdown(false);
+                        setBaseAmount('');
+                        setTaxFeeAmount('');
+                      }}
+                      className="text-zinc-500 hover:text-zinc-300"
+                      aria-label="Remove breakdown"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={baseAmount}
+                      onChange={(e) => setBaseAmount(e.target.value)}
+                      placeholder={`Actual price (${userProfile.currencySymbol})`}
+                      className={`w-full rounded-xl border px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none ${
+                        isDark ? 'border-zinc-800 bg-zinc-900 text-zinc-100 placeholder-zinc-600' : 'border-zinc-200 bg-white text-zinc-900 placeholder-zinc-400'
+                      }`}
+                    />
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={taxFeeAmount}
+                      onChange={(e) => setTaxFeeAmount(e.target.value)}
+                      placeholder={`Tax / fee (${userProfile.currencySymbol})`}
+                      className={`w-full rounded-xl border px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none ${
+                        isDark ? 'border-zinc-800 bg-zinc-900 text-zinc-100 placeholder-zinc-600' : 'border-zinc-200 bg-white text-zinc-900 placeholder-zinc-400'
+                      }`}
+                    />
+                  </div>
+                  <p className="text-[10px] text-zinc-500">
+                    Just for your records — the Amount above is still what actually left your account.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
           {(type === 'borrow' || type === 'lend') && (
             <div>
@@ -461,6 +558,51 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
             </div>
           )}
 
+          {/* Bill / receipt photo */}
+          <div>
+            <label className="text-xs font-medium text-zinc-500 block mb-1">
+              Bill / receipt photo (Optional)
+            </label>
+            {receiptImage ? (
+              <div className="relative inline-block">
+                <img
+                  src={receiptImage}
+                  alt="Attached receipt"
+                  className="h-28 w-28 rounded-xl border object-cover"
+                  style={{ borderColor: isDark ? '#27272a' : '#e4e4e7' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setReceiptImage('')}
+                  className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-rose-500 text-white"
+                  aria-label="Remove photo"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ) : (
+              <label
+                className={`flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed py-4 text-xs font-bold ${
+                  isDark ? 'border-zinc-700 text-zinc-400 hover:border-zinc-500' : 'border-zinc-300 text-zinc-500 hover:border-zinc-400'
+                }`}
+              >
+                {isCompressing ? (
+                  <>Attaching…</>
+                ) : (
+                  <>
+                    <Camera className="h-4 w-4" /> Attach a photo of the bill
+                  </>
+                )}
+                <input type="file" accept="image/*" capture="environment" onChange={handlePickImage} className="hidden" disabled={isCompressing} />
+              </label>
+            )}
+            {imageError && (
+              <p className="mt-1 flex items-center gap-1 text-xs font-semibold text-rose-400">
+                <ImageOff className="h-3.5 w-3.5" /> {imageError}
+              </p>
+            )}
+          </div>
+
           {/* Notes */}
           <div>
             <label className="text-xs font-medium text-zinc-500 block mb-1">
@@ -502,4 +644,3 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
     </div>
   );
 };
-
