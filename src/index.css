@@ -119,8 +119,27 @@ h1, h2, h3, h4, p, span, div, button, label {
 .flex > *, .inline-flex > *, .grid > * { min-width: 0; }
 
 /* Inputs below 16px make Android and iOS zoom the viewport on focus, which is
-   the "layout jumps when I start typing" problem. 16px is the floor. */
+   the "layout jumps when I start typing" / "screen zooms in when I tap a
+   field" problem. 16px is the floor. */
 input, select, textarea {
+  font-size: 16px !important;
+}
+
+/*
+ * THE BUG THIS SECTION FIXES
+ * The rule above loses to the Typography floor rules below it (.text-xs,
+ * .text-sm) even though both carry !important — when two !important rules
+ * collide, the browser breaks the tie by specificity, not by source order.
+ * `input` is a type selector (specificity 0-0-1); `.text-sm` is a class
+ * selector (0-1-0), which is HIGHER. So any <input className="text-sm"> —
+ * i.e. nearly every field in this app's forms — was actually rendering at
+ * 14.5px, not 16px, and kept triggering the browser's zoom-on-focus. These
+ * tag+class compound selectors are specificity 0-1-1, which finally beats
+ * the class-only rules and makes the 16px floor really apply to form fields.
+ */
+input.text-xs, input.text-sm, input.text-\[9px\], input.text-\[10px\], input.text-\[11px\],
+select.text-xs, select.text-sm,
+textarea.text-xs, textarea.text-sm {
   font-size: 16px !important;
 }
 
