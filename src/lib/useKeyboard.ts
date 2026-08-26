@@ -5,11 +5,26 @@ import { useEffect } from 'react';
  * variable, plus a `.mp-kb-open` class on <html>.
  *
  * THE BUG THIS FIXES
- * The bottom navigation is `position: fixed`. On Android the WebView resizes
- * when the keyboard opens, so the bar was re-pinned to the new (shorter)
- * viewport bottom — which put it directly on top of the keyboard, covering the
- * very field being typed into. VisualViewport reports the real occluded height,
- * so the bar can be hidden for the duration and modals can shrink to fit.
+ * The bottom navigation is `position: fixed`, which pins it to the bottom of
+ * the current viewport — which is exactly where the keyboard's own
+ * suggestion/autocomplete strip sits once the keyboard is open. Without this
+ * hook the bar just sits there covering it.
+ *
+ * THE BUG *IN* THE PREVIOUS FIX
+ * It compared `visualViewport.height` against `window.innerHeight` to work out
+ * how much space the keyboard was covering. That comparison assumes
+ * `window.innerHeight` stays fixed while only the visual viewport shrinks —
+ * true in a plain desktop/mobile browser tab, but NOT true in the installed
+ * app. Capacitor's default Android `windowSoftInputMode` is `adjustResize`,
+ * which resizes the WebView's layout viewport (`window.innerHeight`) right
+ * along with the visual one. So both numbers shrank together, the "occluded"
+ * gap stayed near zero, and the keyboard was never detected as open — the bar
+ * never moved, which is exactly the "bottom bar sits over the keyboard" report.
+ *
+ * The fix: track the largest viewport height actually observed as the
+ * keyboard-closed baseline, instead of trusting `window.innerHeight` to stay
+ * put. The baseline resets whenever the viewport *width* changes (a rotation
+ * or window resize), since opening a keyboard never changes the width.
  *
  * VisualViewport is supported by Android WebView 61+ and iOS 13+. The
  * focusin/focusout fallback covers anything older.
@@ -25,9 +40,23 @@ export function useKeyboardInset(): void {
     };
 
     if (vv) {
+      let baselineWidth = vv.width;
+      let baselineHeight = vv.height;
+
       const onResize = () => {
-        // How much of the layout viewport the keyboard is covering.
-        const occluded = window.innerHeight - vv.height - vv.offsetTop;
+        if (vv.width !== baselineWidth) {
+          // Width changed => rotation/window resize, not a keyboard. Re-baseline.
+          baselineWidth = vv.width;
+          baselineHeight = vv.height;
+          setOpen(false);
+          return;
+        }
+        // The viewport can grow back taller than our recorded baseline (e.g.
+        // browser chrome hiding on scroll) — keep raising the baseline so
+        // that never gets misread as a keyboard closing further.
+        if (vv.height > baselineHeight) baselineHeight = vv.height;
+
+        const occluded = baselineHeight - vv.height;
         // Below ~120px it is browser chrome moving, not a keyboard.
         setOpen(occluded > 120, occluded > 120 ? occluded : 0);
       };
