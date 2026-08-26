@@ -12,7 +12,8 @@ import {
   Calendar,
   Tag,
   CreditCard,
-  Receipt
+  Receipt,
+  X
 } from 'lucide-react';
 import { AddTransactionModal } from './AddTransactionModal';
 
@@ -23,6 +24,7 @@ export const TransactionsView: React.FC = () => {
   const [selectedType, setSelectedType] = useState<string>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
   const filteredTransactions = useMemo(() => {
     return transactions.filter((tx) => {
@@ -150,20 +152,41 @@ export const TransactionsView: React.FC = () => {
                   <div className="min-w-0">
                     <h4 className="truncate text-sm font-semibold text-white">{tx.title}</h4>
                     <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-400 mt-0.5">
-                      <span className="rounded-md bg-zinc-900 border border-zinc-800 px-2 py-0.5 text-[10px] font-mono uppercase tracking-wider text-zinc-300">
+                      <span className="shrink-0 whitespace-nowrap max-w-full truncate rounded-md bg-zinc-900 border border-zinc-800 px-2 py-0.5 text-[10px] font-mono uppercase tracking-wider text-zinc-300">
                         {tx.category}
                       </span>
-                      <span className="flex items-center gap-1 text-[11px] text-zinc-500 font-mono">
-                        <Calendar className="h-3 w-3 text-zinc-500" />
+                      <span className="flex shrink-0 items-center gap-1 whitespace-nowrap text-[11px] text-zinc-500 font-mono">
+                        <Calendar className="h-3 w-3 shrink-0 text-zinc-500" />
                         {new Date(tx.date).toLocaleDateString()}
                       </span>
-                      <span className="flex items-center gap-1 text-[11px] text-zinc-500 font-mono">
-                        <CreditCard className="h-3 w-3 text-zinc-500" />
+                      <span className="flex shrink-0 items-center gap-1 whitespace-nowrap text-[11px] text-zinc-500 font-mono">
+                        <CreditCard className="h-3 w-3 shrink-0 text-zinc-500" />
                         {tx.paymentMethod}
                       </span>
                     </div>
+                    {(tx.baseAmount || tx.taxFeeAmount) && (
+                      <p className="text-[11px] text-zinc-500 mt-1">
+                        {tx.baseAmount ? `${userProfile.currencySymbol}${tx.baseAmount.toLocaleString()} price` : ''}
+                        {tx.baseAmount && tx.taxFeeAmount ? ' + ' : ''}
+                        {tx.taxFeeAmount ? `${userProfile.currencySymbol}${tx.taxFeeAmount.toLocaleString()} tax/fee` : ''}
+                      </p>
+                    )}
                     {tx.notes && (
                       <p className="text-[11px] text-zinc-500 mt-1 italic">{tx.notes}</p>
+                    )}
+                    {tx.receiptImage && (
+                      <button
+                        type="button"
+                        onClick={() => setLightboxImage(tx.receiptImage!)}
+                        className="mt-1.5 block"
+                        aria-label="View attached receipt"
+                      >
+                        <img
+                          src={tx.receiptImage}
+                          alt="Receipt"
+                          className="h-10 w-10 rounded-lg border border-zinc-800 object-cover"
+                        />
+                      </button>
                     )}
                   </div>
                 </div>
@@ -220,6 +243,28 @@ export const TransactionsView: React.FC = () => {
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
       />
+
+      {lightboxImage && (
+        <div
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-black/85 p-6"
+          onClick={() => setLightboxImage(null)}
+        >
+          <button
+            type="button"
+            onClick={() => setLightboxImage(null)}
+            className="mp-tap absolute right-4 top-4 flex items-center justify-center rounded-full bg-zinc-900 text-zinc-300"
+            aria-label="Close"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          <img
+            src={lightboxImage}
+            alt="Receipt"
+            className="max-h-full max-w-full rounded-2xl object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   );
 };

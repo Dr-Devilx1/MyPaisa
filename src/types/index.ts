@@ -50,6 +50,12 @@ export interface Transaction {
   paymentMethod: 'Cash' | 'Credit Card' | 'Bank Transfer' | 'Digital Wallet' | 'Other';
   /** Which bank/wallet/cash account this moved money into or out of, if any. */
   accountId?: string;
+  /** Base price before tax/fee — `amount` stays the actual total charged. */
+  baseAmount?: number;
+  /** Tax, delivery fee, service charge etc. included in `amount`. */
+  taxFeeAmount?: number;
+  /** Optional photo of the bill/receipt, stored as a compressed data URL. */
+  receiptImage?: string;
   tags?: string[];
   isPending?: boolean;
   pendingNote?: string;
@@ -175,6 +181,9 @@ export interface UserProfile {
   googleEmail?: string;
   /** ISO timestamp of the last successful Google Drive sync. */
   lastCloudSyncAt?: string;
+  /** User's own free Gemini API key — enables real-time AI chat directly
+   *  from the device, with no server required (works inside the APK). */
+  geminiApiKey?: string;
 }
 
 export interface AiInsight {
@@ -213,4 +222,3 @@ export interface HostelEntry {
   messFeeNotes?: string;
   createdAt: string;
 }
-
