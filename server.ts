@@ -16,7 +16,7 @@ const PORT = Number(process.env.PORT) || 3000;
  * on your key the request 500s and the app silently falls back to offline mode,
  * which looks like "the AI is broken". Override with GEMINI_MODEL if needed.
  */
-const MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+const MODEL = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
 
 // Lazy initialization of Gemini client
 function getGeminiClient() {

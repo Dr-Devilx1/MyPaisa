@@ -110,7 +110,7 @@ Android APK (there is no server there).
 
 ```
 GEMINI_API_KEY=     # enables the online AI advisor (server-hosted web build only)
-GEMINI_MODEL=       # defaults to gemini-2.5-flash
+GEMINI_MODEL=       # defaults to gemini-3.6-flash
 SMTP_HOST=          # enables server-side backup email
 SMTP_PORT=
 SMTP_USER=
@@ -136,6 +136,8 @@ device; the server is only relevant if you host the web version.
 - "Your Financial Situation" bottom-line dashboard in Analytics
 - Real-time AI chat and insights powered by a user-supplied Gemini API key,
   managed from Settings
+- Fixed: Gemini calls failing after Google retired the gemini-2.5-flash
+  model — the AI advisor now targets gemini-3.6-flash
 - Fixed: category/amount text rendering as a vertical single-character
   column in narrow layouts (Transactions, Analytics timeframe pills, Goals,
   Memories)
