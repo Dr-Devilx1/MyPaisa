@@ -97,16 +97,22 @@ export const AiAssistantView: React.FC = () => {
           <div className="min-w-0 flex-1">
             <h2 className="text-base font-bold tracking-tight">Money assistant</h2>
             <p className="text-[11px] mp-text-3">
-              {isOnline
+              {userProfile.geminiApiKey
+                ? 'Live AI, answering from your real numbers.'
+                : isOnline
                 ? 'Answers come from the records on this device.'
                 : 'Offline — still fully usable, everything is stored locally.'}
             </p>
           </div>
-          {!isOnline && (
+          {userProfile.geminiApiKey ? (
+            <span className="flex shrink-0 items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-1 text-[11px] font-bold text-emerald-400">
+              <Sparkles className="h-3 w-3" /> Live
+            </span>
+          ) : !isOnline ? (
             <span className="flex shrink-0 items-center gap-1 rounded-full bg-amber-500/10 px-2.5 py-1 text-[11px] font-bold text-amber-400">
               <WifiOff className="h-3 w-3" /> Offline
             </span>
-          )}
+          ) : null}
         </div>
 
         <div className="mt-4 grid grid-cols-3 gap-2.5">
