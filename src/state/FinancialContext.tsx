@@ -55,6 +55,55 @@ function inRange(iso: string, from: Date, to: Date): boolean {
   return !Number.isNaN(t) && t >= from.getTime() && t < to.getTime();
 }
 
+const GEMINI_MODEL = 'gemini-2.5-flash';
+
+/**
+ * Calls Gemini directly from the device using the user's own free API key —
+ * no server involved. This is what makes the AI advisor work "for real" in
+ * the installed APK, where there is no backend to talk to at all (server.ts
+ * is a web-only convenience, never bundled into the app).
+ */
+async function callGeminiDirect(
+  apiKey: string,
+  systemInstruction: string,
+  userText: string,
+  opts: { json?: boolean } = {}
+): Promise<string> {
+  const res = await fetchWithTimeout(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ role: 'user', parts: [{ text: userText }] }],
+        systemInstruction: { parts: [{ text: systemInstruction }] },
+        generationConfig: {
+          temperature: opts.json ? 0.2 : 0.7,
+          ...(opts.json ? { responseMimeType: 'application/json' } : {}),
+        },
+      }),
+    },
+    20000
+  );
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    let reason = `Gemini returned ${res.status}`;
+    try {
+      const parsed = JSON.parse(body);
+      if (parsed?.error?.message) reason = parsed.error.message;
+    } catch {
+      /* keep default reason */
+    }
+    throw new Error(reason);
+  }
+
+  const data = await res.json();
+  const text = data?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? '').join('') ?? '';
+  if (!text) throw new Error('Gemini returned an empty response.');
+  return text;
+}
+
 interface FinancialContextType {
   // State
   transactions: Transaction[];
@@ -148,6 +197,8 @@ interface FinancialContextType {
   renameAccount: (id: string, name: string) => void;
   setAccountBalance: (id: string, balance: number) => void;
   deleteAccount: (id: string) => void;
+  /** Moves money between two of the user's own accounts (e.g. bank -> cash). Does not touch income/expense totals. */
+  transferFunds: (fromAccountId: string, toAccountId: string, amount: number, note?: string) => { ok: boolean; message: string };
   completeAccountSetup: (input: {
     banks: { name: string; balance: number }[];
     wallets: { name: string; balance: number }[];
@@ -784,6 +835,39 @@ export const FinancialProvider: React.FC<{ children: ReactNode }> = ({ children 
     setAccounts((prev) => prev.filter((a) => a.id !== id));
   };
 
+  /**
+   * Moving money from one of your own accounts to another (bank -> cash,
+   * wallet -> bank, ...) is not income or an expense, so it deliberately does
+   * NOT create a Transaction or touch totalIncome/totalExpense — it only
+   * moves the balance between the two accounts.
+   */
+  const transferFunds = (
+    fromAccountId: string,
+    toAccountId: string,
+    amount: number,
+    note?: string
+  ): { ok: boolean; message: string } => {
+    if (fromAccountId === toAccountId) return { ok: false, message: 'Pick two different accounts.' };
+    if (!Number.isFinite(amount) || amount <= 0) return { ok: false, message: 'Enter an amount greater than zero.' };
+
+    const from = accounts.find((a) => a.id === fromAccountId);
+    const to = accounts.find((a) => a.id === toAccountId);
+    if (!from || !to) return { ok: false, message: 'Account not found.' };
+
+    setAccounts((prev) =>
+      prev.map((a) => {
+        if (a.id === fromAccountId) return { ...a, balance: a.balance - amount };
+        if (a.id === toAccountId) return { ...a, balance: a.balance + amount };
+        return a;
+      })
+    );
+
+    return {
+      ok: true,
+      message: `Moved ${amount.toLocaleString()} from ${from.name} to ${to.name}${note ? ` (${note})` : ''}.`,
+    };
+  };
+
   /** New-user wizard: bulk-create every bank/wallet/cash entry in one go. */
   const completeAccountSetup = (input: {
     banks: { name: string; balance: number }[];
@@ -1065,6 +1149,41 @@ export const FinancialProvider: React.FC<{ children: ReactNode }> = ({ children 
   const requestAiAnalysis = async () => {
     setIsAiThinking(true);
     try {
+      const geminiKey = userProfile.geminiApiKey?.trim();
+
+      if (geminiKey) {
+        // Calls Gemini directly from the device — works inside the installed
+        // APK too, since it never depends on server.ts being reachable.
+        const prompt = `Analyze this person's personal finances and return ONLY JSON matching this structure (no markdown fences):
+{
+  "healthScore": number (0 to 100),
+  "summary": string,
+  "highlights": string[],
+  "suggestions": string[],
+  "spendingHabitRisk": "low" | "medium" | "high",
+  "predictedNextMonthExpense": number
+}
+
+Current balance: ${userProfile.currencySymbol}${netWorth}
+Monthly income: ${userProfile.currencySymbol}${totalIncome}
+Monthly expenses: ${userProfile.currencySymbol}${totalExpense}
+Money lent out (to receive): ${userProfile.currencySymbol}${totalLent}
+Money borrowed (to pay): ${userProfile.currencySymbol}${totalBorrowed}
+Fixed monthly bills: ${userProfile.currencySymbol}${totalFixedObligationsAmount} total, ${userProfile.currencySymbol}${paidFixedObligationsAmount} already paid
+Recent transactions (up to 30): ${JSON.stringify(transactions.slice(0, 30).map((t) => ({ title: t.title, amount: t.amount, type: t.type, category: t.mainCategory, date: t.date })))}
+Active budgets: ${JSON.stringify(budgets.map((b) => ({ category: b.category, limit: b.limitAmount, spent: b.spentAmount })))}`;
+
+        const text = await callGeminiDirect(
+          geminiKey,
+          'You are My Paisa, an expert personal finance analyst. Respond with strict JSON only, no prose outside the JSON object.',
+          prompt,
+          { json: true }
+        );
+        const parsed = JSON.parse(text);
+        setAiInsight(parsed);
+        return;
+      }
+
       // BUGFIX: no timeout meant that in the installed APK (where there is no
       // server at all) this request could hang for the platform default of
       // ~2 minutes with the spinner stuck on screen. It now gives up after 12s
@@ -1205,10 +1324,13 @@ export const FinancialProvider: React.FC<{ children: ReactNode }> = ({ children 
     try {
       const userContext = {
         balance: netWorth,
+        currentAccountsBalance: totalAccountsBalance,
+        accounts: accounts.map((a) => ({ name: a.name, type: a.type, balance: a.balance })),
         monthlyIncome: totalIncome,
         monthlyExpenses: totalExpense,
         fixedBillsTotal: totalFixedObligationsAmount,
         fixedBillsPaid: paidFixedObligationsAmount,
+        unpaidFixedBills: fixedObligations.filter((o) => !o.isPaid).map((o) => ({ title: o.title, amount: o.amount, dueDay: o.dueDateDay })),
         budgetCount: budgets.length,
         goalCount: goals.length,
         borrowLendNet,
@@ -1216,6 +1338,40 @@ export const FinancialProvider: React.FC<{ children: ReactNode }> = ({ children 
         totalBorrowed,
         healthScore: financialHealthScore,
       };
+
+      const geminiKey = userProfile.geminiApiKey?.trim();
+
+      if (geminiKey) {
+        // Calls Gemini directly from the device with the user's real,
+        // up-to-the-second financial context — real-time, no server, and
+        // free within Gemini's free-tier quota.
+        const systemInstruction = `You are My Paisa, an expert AI Personal Financial Assistant developed by SIHFZ.
+You answer the user's question directly, using their real financial context below. Be specific with numbers, not generic advice.
+User's Financial Context (currency: ${userProfile.currencySymbol}):
+${JSON.stringify(userContext, null, 2)}
+
+Rules:
+1. Answer the actual question asked, referencing the real numbers above.
+2. Be concise, professional, and encouraging.
+3. Format with light Markdown (bullet points, bold) where it helps readability.
+4. If the numbers suggest a risk (spending near/over income, big unpaid bills, heavy debt), say so plainly.`;
+
+        const conversation = [...aiChatMessages, userMsg]
+          .map((m) => `${m.sender === 'user' ? 'User' : 'Assistant'}: ${m.text}`)
+          .join('\n');
+
+        const text = await callGeminiDirect(geminiKey, systemInstruction, conversation);
+
+        const aiMsg: ChatMessage = {
+          id: uid('ai'),
+          sender: 'assistant',
+          text,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        };
+        setAiChatMessages((prev) => [...prev, aiMsg]);
+        setIsAiThinking(false);
+        return;
+      }
 
       const res = await fetchWithTimeout('/api/ai/chat', {
         method: 'POST',
@@ -1241,15 +1397,19 @@ export const FinancialProvider: React.FC<{ children: ReactNode }> = ({ children 
 
       setAiChatMessages((prev) => [...prev, aiMsg]);
     } catch (e) {
-      // NOTE: reaching this branch means the AI SERVER did not answer. It does
-      // NOT mean the device is offline — in the installed APK there is no server
-      // bundled at all, so this path is the normal case. The old copy told users
-      // to "connect to internet" here, which is why a phone on working Wi-Fi was
-      // constantly being told it had no connection.
-      console.info('[My Paisa] AI server unavailable; using on-device engine.', e);
+      // NOTE: reaching this branch means neither Gemini (direct or via server)
+      // answered. It does NOT mean the device is offline — in the installed
+      // APK there is no server bundled at all, so this path is the normal
+      // case unless a Gemini API key is set in Settings. The old copy told
+      // users to "connect to internet" here, which is why a phone on working
+      // Wi-Fi was constantly being told it had no connection.
+      console.info('[My Paisa] AI unavailable; using on-device engine.', e);
+      const geminiKeySet = !!userProfile.geminiApiKey?.trim();
+      const reason = e instanceof Error ? e.message : String(e);
       const fallbackText =
-        offlineReply ||
-        `**On-device mode** — answering from the records stored on your phone.\n\n- Current Balance: **${userProfile.currencySymbol}${netWorth.toLocaleString()}**\n- Monthly Income: **${userProfile.currencySymbol}${totalIncome.toLocaleString()}**\n- Monthly Expenses: **${userProfile.currencySymbol}${totalExpense.toLocaleString()}**\n- Financial Score: **${financialHealthScore}/100**\n\nThese figures come straight from your device, so they are accurate offline.`;
+        (geminiKeySet ? `_Gemini didn't answer (${reason}) — falling back to on-device mode._\n\n` : '') +
+        (offlineReply ||
+          `**On-device mode** — answering from the records stored on your phone.\n\n- Current Balance: **${userProfile.currencySymbol}${netWorth.toLocaleString()}**\n- Monthly Income: **${userProfile.currencySymbol}${totalIncome.toLocaleString()}**\n- Monthly Expenses: **${userProfile.currencySymbol}${totalExpense.toLocaleString()}**\n- Financial Score: **${financialHealthScore}/100**\n\nThese figures come straight from your device, so they are accurate offline.`);
 
       const errorMsg: ChatMessage = {
         id: uid('err'),
@@ -1328,6 +1488,7 @@ export const FinancialProvider: React.FC<{ children: ReactNode }> = ({ children 
         renameAccount,
         setAccountBalance,
         deleteAccount,
+        transferFunds,
         completeAccountSetup,
         skipAccountSetup,
         addMemory,
@@ -1371,4 +1532,3 @@ export const useFinancials = () => {
   }
   return context;
 };
-
