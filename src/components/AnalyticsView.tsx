@@ -12,11 +12,46 @@ import {
   FileSpreadsheet,
   FileText,
   Calendar,
-  Filter
+  Filter,
+  Activity,
+  HandCoins,
+  Landmark,
+  ReceiptText,
+  Scale
 } from 'lucide-react';
 
 export const AnalyticsView: React.FC = () => {
-  const { transactions, userProfile, totalIncome, totalExpense, netWorth } = useFinancials();
+  const {
+    transactions,
+    userProfile,
+    totalIncome,
+    totalExpense,
+    netWorth,
+    accounts,
+    totalAccountsBalance,
+    totalLent,
+    totalBorrowed,
+    borrowLendNet,
+    fixedObligations,
+    totalFixedObligationsAmount,
+    paidFixedObligationsAmount,
+    monthlyIncome,
+    monthlyExpense,
+  } = useFinancials();
+
+  const cur = userProfile.currencySymbol;
+  const money = (n: number) => `${cur}${Math.round(n).toLocaleString()}`;
+
+  const unpaidFixedAmount = totalFixedObligationsAmount - paidFixedObligationsAmount;
+  const unpaidFixedCount = fixedObligations.filter((o) => !o.isPaid).length;
+  const currentBalance = accounts.length > 0 ? totalAccountsBalance : netWorth;
+
+  /**
+   * "If I collected every rupee owed to me, paid off everything I owe, and
+   * cleared this month's remaining bills right now — what would I actually
+   * have left?" The single number the user asked for.
+   */
+  const bottomLine = currentBalance + totalLent - totalBorrowed - unpaidFixedAmount;
 
   const isDark = userProfile.themeMode === 'dark';
 
@@ -138,11 +173,11 @@ export const AnalyticsView: React.FC = () => {
 
           <div className="summary-box">
             <div className="card">
-              <div className="card-title">Income ({timeframe})</div>
+              <div className="card-title">Income (${timeframe})</div>
               <div className="card-value" style="color:#16a34a">${userProfile.currencySymbol}${periodIncome.toLocaleString()}</div>
             </div>
             <div className="card">
-              <div className="card-title">Expense ({timeframe})</div>
+              <div className="card-title">Expense (${timeframe})</div>
               <div className="card-value" style="color:#dc2626">${userProfile.currencySymbol}${periodExpense.toLocaleString()}</div>
             </div>
             <div className="card">
@@ -211,12 +246,12 @@ export const AnalyticsView: React.FC = () => {
 
         {/* Timeframe selector & Export buttons */}
         <div className="flex flex-wrap items-center gap-2">
-          <div className={`flex items-center rounded-2xl p-1 border ${isDark ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-100 border-zinc-200'}`}>
+          <div className={`flex items-center gap-0.5 overflow-x-auto rounded-2xl p-1 border ${isDark ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-100 border-zinc-200'}`}>
             {(['daily', 'weekly', 'monthly', 'yearly', 'all'] as const).map((tf) => (
               <button
                 key={tf}
                 onClick={() => setTimeframe(tf)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all capitalize ${
+                className={`shrink-0 whitespace-nowrap px-3 py-1.5 rounded-xl text-xs font-bold transition-all capitalize ${
                   timeframe === tf
                     ? 'bg-indigo-500 text-white shadow-md'
                     : isDark
@@ -251,6 +286,91 @@ export const AnalyticsView: React.FC = () => {
             >
               <FileText className="h-3.5 w-3.5" /> PDF
             </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ===================== YOUR FINANCIAL SITUATION ===================== */}
+      <div className={`rounded-[2rem] border p-7 shadow-xl ${
+        isDark ? 'bg-[#131316] border-zinc-800' : 'bg-white border-zinc-200 shadow-xs'
+      }`}>
+        <div className="flex items-center gap-2 mb-1">
+          <Activity className="h-5 w-5 text-violet-500" />
+          <h3 className={`text-lg font-bold tracking-tight ${isDark ? 'text-white' : 'text-zinc-900'}`}>
+            Your Financial Situation
+          </h3>
+        </div>
+        <p className="text-xs text-zinc-500 font-medium mb-5">
+          Everything you own, owe, and are owed — combined into one picture.
+        </p>
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="mp-inset p-4">
+            <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide mp-text-3">
+              <Wallet className="h-3.5 w-3.5" /> Current balance
+            </span>
+            <p className="mp-num mt-1.5 truncate text-xl font-extrabold">{money(currentBalance)}</p>
+            {accounts.length > 0 && <p className="text-[10px] mp-text-3 mt-0.5">Across {accounts.length} account{accounts.length === 1 ? '' : 's'}</p>}
+          </div>
+
+          <div className="mp-inset p-4">
+            <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide mp-text-3">
+              <HandCoins className="h-3.5 w-3.5" /> You'll receive
+            </span>
+            <p className="mp-num mt-1.5 truncate text-xl font-extrabold text-emerald-500">{money(totalLent)}</p>
+            <p className="text-[10px] mp-text-3 mt-0.5">Money lent out, unpaid</p>
+          </div>
+
+          <div className="mp-inset p-4">
+            <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide mp-text-3">
+              <Landmark className="h-3.5 w-3.5" /> You owe
+            </span>
+            <p className="mp-num mt-1.5 truncate text-xl font-extrabold text-rose-500">{money(totalBorrowed)}</p>
+            <p className="text-[10px] mp-text-3 mt-0.5">Borrowed, still unpaid</p>
+          </div>
+
+          <div className="mp-inset p-4">
+            <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide mp-text-3">
+              <ReceiptText className="h-3.5 w-3.5" /> Fixed bills left
+            </span>
+            <p className="mp-num mt-1.5 truncate text-xl font-extrabold text-amber-500">{money(unpaidFixedAmount)}</p>
+            <p className="text-[10px] mp-text-3 mt-0.5">
+              {unpaidFixedCount} of {fixedObligations.length} unpaid this month
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-2xl p-5" style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.12), rgba(99,102,241,0.06))', border: '1px solid rgba(139,92,246,0.25)' }}>
+          <div className="flex items-center gap-2 mb-1">
+            <Scale className="h-4 w-4 text-violet-400" />
+            <span className="text-xs font-bold uppercase tracking-wide text-violet-400">Bottom line</span>
+          </div>
+          <p className={`mp-num text-2xl font-extrabold ${bottomLine >= 0 ? (isDark ? 'text-white' : 'text-zinc-900') : 'text-rose-500'}`}>
+            {money(bottomLine)}
+          </p>
+          <p className="text-[11px] mp-text-3 mt-1.5">
+            What you'd have left if you collected every rupee owed to you, paid off everything you owe,
+            and cleared this month's remaining bills — right now.
+          </p>
+          <p className="text-[10px] mp-text-3 mt-2">
+            {money(currentBalance)} balance + {money(totalLent)} to receive − {money(totalBorrowed)} to pay − {money(unpaidFixedAmount)} unpaid bills
+          </p>
+        </div>
+
+        <div className="mt-4 grid grid-cols-3 gap-2.5">
+          <div className="mp-inset p-3 text-center">
+            <span className="block text-[10px] font-semibold uppercase mp-text-3">This month in</span>
+            <span className="mp-num text-sm font-bold text-emerald-500">{money(monthlyIncome)}</span>
+          </div>
+          <div className="mp-inset p-3 text-center">
+            <span className="block text-[10px] font-semibold uppercase mp-text-3">This month out</span>
+            <span className="mp-num text-sm font-bold text-rose-500">{money(monthlyExpense)}</span>
+          </div>
+          <div className="mp-inset p-3 text-center">
+            <span className="block text-[10px] font-semibold uppercase mp-text-3">Net debt position</span>
+            <span className={`mp-num text-sm font-bold ${borrowLendNet >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+              {money(borrowLendNet)}
+            </span>
           </div>
         </div>
       </div>
@@ -371,5 +491,3 @@ export const AnalyticsView: React.FC = () => {
     </div>
   );
 };
-
-
