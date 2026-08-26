@@ -22,6 +22,7 @@ import {
   CloudUpload,
   CloudDownload,
   ExternalLink,
+  Sparkles,
 } from 'lucide-react';
 import { Logo } from './Logo';
 import {
@@ -46,14 +47,14 @@ import {
 const CURRENCIES = [
   { code: 'PKR', symbol: 'Rs', name: 'Pakistani Rupee (Rs)' },
   { code: 'USD', symbol: '$', name: 'US Dollar ($)' },
-  { code: 'EUR', symbol: '\u20AC', name: 'Euro (\u20AC)' },
-  { code: 'GBP', symbol: '\u00A3', name: 'British Pound (\u00A3)' },
-  { code: 'INR', symbol: '\u20B9', name: 'Indian Rupee (\u20B9)' },
+  { code: 'EUR', symbol: '€', name: 'Euro (€)' },
+  { code: 'GBP', symbol: '£', name: 'British Pound (£)' },
+  { code: 'INR', symbol: '₹', name: 'Indian Rupee (₹)' },
   { code: 'AED', symbol: 'AED', name: 'UAE Dirham (AED)' },
   { code: 'SAR', symbol: 'SAR', name: 'Saudi Riyal (SAR)' },
   { code: 'CAD', symbol: 'CA$', name: 'Canadian Dollar (CA$)' },
   { code: 'AUD', symbol: 'A$', name: 'Australian Dollar (A$)' },
-  { code: 'JPY', symbol: '\u00A5', name: 'Japanese Yen (\u00A5)' },
+  { code: 'JPY', symbol: '¥', name: 'Japanese Yen (¥)' },
 ];
 
 type Banner = { tone: 'ok' | 'warn' | 'error'; text: string } | null;
@@ -83,6 +84,7 @@ export const SettingsView: React.FC = () => {
   const [googleOn, setGoogleOn] = useState(() => currentSession() !== null);
   const [pinDraft, setPinDraft] = useState('');
   const [pinConfirm, setPinConfirm] = useState('');
+  const [geminiKeyDraft, setGeminiKeyDraft] = useState(userProfile.geminiApiKey ?? '');
   const fileRef = useRef<HTMLInputElement>(null);
 
   const backupAge = daysSince(userProfile.lastBackupAt);
@@ -596,6 +598,76 @@ export const SettingsView: React.FC = () => {
             </>
           )}
         </div>
+      </div>
+
+      {/* AI Assistant — real-time Gemini, called directly from the device */}
+      <div className={`rounded-[2rem] border p-7 shadow-xl ${card}`}>
+        <div className={`mb-4 flex items-center gap-2 border-b pb-3 ${isDark ? 'border-zinc-800' : 'border-slate-200'}`}>
+          <Sparkles className="h-4 w-4 text-violet-400" />
+          <h3 className={`text-sm font-bold tracking-tight ${heading}`}>AI Assistant (Gemini)</h3>
+        </div>
+
+        <p className={`text-[11px] leading-relaxed mb-4 ${sub}`}>
+          Without a key, the AI Advisor answers using a built-in offline engine — accurate but scripted.
+          Add your own <strong>free</strong> Gemini API key below and it answers your actual question in
+          real time, using your real balance, debts, and bills — with no server involved, so it works
+          inside the installed app too.
+        </p>
+
+        {userProfile.geminiApiKey ? (
+          <div className="flex items-center gap-2 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 mb-4">
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
+            <span className="text-[11px] font-semibold text-emerald-500">
+              Gemini key saved. Ask the AI Advisor anything — it now answers live.
+            </span>
+          </div>
+        ) : null}
+
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
+          <input
+            type="password"
+            value={geminiKeyDraft}
+            onChange={(e) => setGeminiKeyDraft(e.target.value)}
+            placeholder="Paste your Gemini API key"
+            autoComplete="off"
+            className={`w-full rounded-xl border px-3.5 py-2.5 text-xs outline-none transition-colors ${field}`}
+          />
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => updateProfile({ geminiApiKey: geminiKeyDraft.trim() || undefined })}
+              disabled={!geminiKeyDraft.trim()}
+              className="rounded-xl bg-violet-600 px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-violet-500 disabled:opacity-40"
+            >
+              Save
+            </button>
+            {userProfile.geminiApiKey && (
+              <button
+                type="button"
+                onClick={() => {
+                  setGeminiKeyDraft('');
+                  updateProfile({ geminiApiKey: undefined });
+                }}
+                className={`rounded-xl border px-4 py-2.5 text-xs font-bold transition-colors ${softBtn}`}
+              >
+                Remove
+              </button>
+            )}
+          </div>
+        </div>
+
+        <a
+          href="https://aistudio.google.com/apikey"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-3 flex items-center gap-1.5 text-[11px] font-bold text-violet-500 hover:text-violet-400"
+        >
+          <ExternalLink className="h-3.5 w-3.5" /> Get a free key from Google AI Studio
+        </a>
+        <p className={`mt-2 text-[10px] leading-relaxed ${sub}`}>
+          The key is stored only on this device, inside your own My Paisa data — it is never sent
+          anywhere except directly to Google's Gemini API when you ask the assistant a question.
+        </p>
       </div>
 
       {/* Danger zone */}
