@@ -18,7 +18,8 @@ import {
   FixedObligation,
   FinancialMemory,
   UserAccount,
-  HostelEntry,
+  TrackedItem,
+  ItemLogType,
   AiInsight,
   ChatMessage,
   TransactionType,
@@ -159,10 +160,12 @@ interface FinancialContextType {
   monthlyExpense: number;
   monthlyNet: number;
 
-  // Hostel Mode
-  hostelEntries: HostelEntry[];
-  addHostelEntry: (entry: Omit<HostelEntry, 'id' | 'createdAt'>) => void;
-  deleteHostelEntry: (id: string) => void;
+  // Item Tracker (consumable stock — snacks, supplies, anything used up over time)
+  trackedItems: TrackedItem[];
+  addTrackedItem: (data: { name: string; unit: string; initialQuantity: number }) => void;
+  restockItem: (itemId: string, quantity: number, cost?: number, notes?: string) => void;
+  consumeItem: (itemId: string, quantity: number, notes?: string) => void;
+  deleteTrackedItem: (id: string) => void;
 
   // Actions
   resetToCleanData: () => Promise<void>;
@@ -261,7 +264,7 @@ export const FinancialProvider: React.FC<{ children: ReactNode }> = ({ children 
   const [memories, setMemories] = useState<FinancialMemory[]>([]);
   const [savedAccounts, setSavedAccounts] = useState<UserAccount[]>([]);
   const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
-  const [hostelEntries, setHostelEntries] = useState<HostelEntry[]>([]);
+  const [trackedItems, setTrackedItems] = useState<TrackedItem[]>([]);
   const [userProfile, setUserProfile] = useState<UserProfile>({ ...DEFAULT_PROFILE });
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [isMobileFrame, setIsMobileFrame] = useState<boolean>(false);
@@ -316,7 +319,7 @@ export const FinancialProvider: React.FC<{ children: ReactNode }> = ({ children 
         setMemories(data.memories ?? []);
         setSavedAccounts(data.savedAccounts ?? []);
         setAccounts(data.financialAccounts ?? []);
-        setHostelEntries(data.hostelEntries ?? []);
+        setTrackedItems(data.trackedItems ?? []);
         setUserProfile(data.userProfile);
 
         // Only unlock straight away when no PIN is configured.
@@ -372,8 +375,8 @@ export const FinancialProvider: React.FC<{ children: ReactNode }> = ({ children 
   }, [transactions]);
 
   useEffect(() => {
-    if (hydratedRef.current) repo.saveHostelEntries(hostelEntries);
-  }, [hostelEntries]);
+    if (hydratedRef.current) repo.saveTrackedItems(trackedItems);
+  }, [trackedItems]);
 
   useEffect(() => {
     if (hydratedRef.current) repo.saveBudgets(budgets);
@@ -603,7 +606,7 @@ export const FinancialProvider: React.FC<{ children: ReactNode }> = ({ children 
     setBorrowLend([]);
     setFixedObligations([]);
     setMemories([]);
-    setHostelEntries([]);
+    setTrackedItems([]);
     setAccounts([]);
     const keptProfile = { ...userProfile, hasCompletedAccountSetup: false };
     setUserProfile(keptProfile);
@@ -619,7 +622,7 @@ export const FinancialProvider: React.FC<{ children: ReactNode }> = ({ children 
     setBorrowLend(demo.borrowLend);
     setFixedObligations(demo.fixedObligations);
     setMemories(demo.memories);
-    setHostelEntries(demo.hostelEntries);
+    setTrackedItems(demo.trackedItems);
     setAccounts(demo.financialAccounts);
     setUserProfile((prev) => ({ ...prev, hasCompletedAccountSetup: true }));
   };
@@ -644,41 +647,41 @@ export const FinancialProvider: React.FC<{ children: ReactNode }> = ({ children 
     if (userProfile.isPinProtected) setIsUnlocked(false);
   };
 
-  const addHostelEntry = (entryData: Omit<HostelEntry, 'id' | 'createdAt'>) => {
-    const newEntry: HostelEntry = {
-      ...entryData,
-      id: uid('hostel'),
-      createdAt: new Date().toISOString(),
+  /** Item Tracker: create a new stock item, optionally seeded with a starting quantity. */
+  const addTrackedItem = (data: { name: string; unit: string; initialQuantity: number }) => {
+    const now = new Date().toISOString();
+    const qty = Math.max(0, data.initialQuantity || 0);
+    const newItem: TrackedItem = {
+      id: uid('item'),
+      name: data.name.trim() || 'Item',
+      unit: data.unit.trim() || 'pcs',
+      currentQuantity: qty,
+      createdAt: now,
+      logs: qty > 0 ? [{ id: uid('il'), type: 'restock', quantity: qty, date: now }] : [],
     };
-    setHostelEntries((prev) => [newEntry, ...prev]);
-
-    // Automatically record daily sum as an Expense transaction under "Food & Living" if sum > 0
-    const totalDailySum =
-      entryData.breakfastAmount +
-      entryData.lunchAmount +
-      entryData.dinnerAmount +
-      entryData.teaAmount +
-      entryData.laundryAmount +
-      entryData.transportAmount +
-      entryData.messFeeAmount;
-
-    if (totalDailySum > 0) {
-      addTransaction({
-        title: `Hostel Daily Expense (${entryData.date})`,
-        amount: totalDailySum,
-        type: 'expense',
-        mainCategory: 'Food & Living',
-        subCategory: 'Hostel Expense',
-        category: 'Food & Dining',
-        date: new Date(entryData.date).toISOString(),
-        notes: `Hostel tracking log: Breakfast ${entryData.breakfastAmount}, Lunch ${entryData.lunchAmount}, Dinner ${entryData.dinnerAmount}, Tea ${entryData.teaAmount}, Laundry ${entryData.laundryAmount}, Transport ${entryData.transportAmount}, Mess Fee ${entryData.messFeeAmount}`,
-        paymentMethod: 'Cash',
-      });
-    }
+    setTrackedItems((prev) => [...prev, newItem]);
   };
 
-  const deleteHostelEntry = (id: string) => {
-    setHostelEntries((prev) => prev.filter((e) => e.id !== id));
+  const addItemLog = (itemId: string, type: ItemLogType, quantity: number, cost?: number, notes?: string) => {
+    if (!Number.isFinite(quantity) || quantity <= 0) return;
+    setTrackedItems((prev) =>
+      prev.map((it) => {
+        if (it.id !== itemId) return it;
+        const entry = { id: uid('il'), type, quantity, date: new Date().toISOString(), cost, notes };
+        const nextQuantity = type === 'restock' ? it.currentQuantity + quantity : Math.max(0, it.currentQuantity - quantity);
+        return { ...it, currentQuantity: nextQuantity, logs: [entry, ...it.logs] };
+      })
+    );
+  };
+
+  const restockItem = (itemId: string, quantity: number, cost?: number, notes?: string) =>
+    addItemLog(itemId, 'restock', quantity, cost, notes);
+
+  const consumeItem = (itemId: string, quantity: number, notes?: string) =>
+    addItemLog(itemId, 'consume', quantity, undefined, notes);
+
+  const deleteTrackedItem = (id: string) => {
+    setTrackedItems((prev) => prev.filter((it) => it.id !== id));
   };
 
   /**
@@ -1138,7 +1141,7 @@ export const FinancialProvider: React.FC<{ children: ReactNode }> = ({ children 
         setMemories(data.memories ?? []);
         setSavedAccounts(data.savedAccounts ?? []);
         setAccounts(data.financialAccounts ?? []);
-        setHostelEntries(data.hostelEntries ?? []);
+        setTrackedItems(data.trackedItems ?? []);
         setUserProfile(data.userProfile);
       });
     }
@@ -1436,7 +1439,7 @@ Rules:
         memories,
         savedAccounts,
         accounts,
-        hostelEntries,
+        trackedItems,
         userProfile,
         activeTab,
         isMobileFrame,
@@ -1493,8 +1496,10 @@ Rules:
         skipAccountSetup,
         addMemory,
         deleteMemory,
-        addHostelEntry,
-        deleteHostelEntry,
+        addTrackedItem,
+        restockItem,
+        consumeItem,
+        deleteTrackedItem,
         saveCustomCategory,
         addFixedObligation,
         toggleFixedObligationPaid,
