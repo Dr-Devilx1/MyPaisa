@@ -223,8 +223,12 @@ select option { background-color: var(--surface-2); color: var(--text); }
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 1.5rem 1.5rem 0 0;
-  /* Leaves room for the status bar, and shrinks as the keyboard grows. */
-  max-height: calc(100dvh - var(--safe-top) - 12px - var(--kb));
+  /* Leaves room for the status bar. `--vvh` is the visual viewport's own
+     height (set from useKeyboardInset) — already shrunk by the keyboard when
+     one is open, so it must NOT also have `--kb` subtracted from it here (that
+     double-counted the keyboard and crushed the modal to a sliver). Falls
+     back to 100dvh where VisualViewport isn't supported. */
+  max-height: calc(var(--vvh, 100dvh) - var(--safe-top) - 12px);
   overflow: hidden;
 }
 @media (min-width: 640px) {

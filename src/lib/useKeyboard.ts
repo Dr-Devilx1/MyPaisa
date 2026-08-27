@@ -2,7 +2,8 @@ import { useEffect } from 'react';
 
 /**
  * Tracks the on-screen keyboard and exposes its height as the `--kb` CSS
- * variable, plus a `.mp-kb-open` class on <html>.
+ * variable, the *actual* visible viewport height as `--vvh`, plus a
+ * `.mp-kb-open` class on <html>.
  *
  * THE BUG THIS FIXES
  * The bottom navigation is `position: fixed`, which pins it to the bottom of
@@ -26,6 +27,18 @@ import { useEffect } from 'react';
  * put. The baseline resets whenever the viewport *width* changes (a rotation
  * or window resize), since opening a keyboard never changes the width.
  *
+ * THE BUG *THAT FIX INTRODUCED* (modal collapsing to a sliver)
+ * Once `--kb` correctly reported the keyboard height under `adjustResize`,
+ * the modal CSS did `max-height: calc(100dvh - var(--kb))` to shrink itself
+ * clear of the keyboard. But under `adjustResize`, `100dvh` had ALREADY
+ * shrunk by the keyboard's height — the layout viewport resized, and `dvh`
+ * follows it. Subtracting `--kb` again double-counted the keyboard, crushing
+ * the modal down to a sliver of its real height and leaving a dead black gap
+ * above the keyboard. `--vvh` (the visual viewport's own height, already
+ * keyboard-adjusted, updated on every resize — not only when the keyboard's
+ * open/closed state flips) gives the CSS a number that is correct as-is, so
+ * nothing needs to subtract `--kb` from it a second time.
+ *
  * VisualViewport is supported by Android WebView 61+ and iOS 13+. The
  * focusin/focusout fallback covers anything older.
  */
@@ -44,6 +57,8 @@ export function useKeyboardInset(): void {
       let baselineHeight = vv.height;
 
       const onResize = () => {
+        root.style.setProperty('--vvh', `${Math.round(vv.height)}px`);
+
         if (vv.width !== baselineWidth) {
           // Width changed => rotation/window resize, not a keyboard. Re-baseline.
           baselineWidth = vv.width;
