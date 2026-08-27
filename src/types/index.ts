@@ -203,22 +203,26 @@ export interface ChatMessage {
   isOfflineResponse?: boolean;
 }
 
-export interface HostelEntry {
+/** A single restock or consumption event against a tracked item. */
+export type ItemLogType = 'restock' | 'consume';
+
+export interface ItemLogEntry {
   id: string;
-  date: string; // YYYY-MM-DD
-  breakfastAmount: number;
-  breakfastNotes?: string;
-  lunchAmount: number;
-  lunchNotes?: string;
-  dinnerAmount: number;
-  dinnerNotes?: string;
-  teaAmount: number;
-  teaNotes?: string;
-  laundryAmount: number;
-  laundryNotes?: string;
-  transportAmount: number;
-  transportNotes?: string;
-  messFeeAmount: number;
-  messFeeNotes?: string;
+  type: ItemLogType;
+  quantity: number;
+  date: string; // ISO string
+  /** Money spent on this restock. Not meaningful for a 'consume' entry. */
+  cost?: number;
+  notes?: string;
+}
+
+/** A simple consumable stock item — snacks, toiletries, anything bought in
+ *  bulk and used up over time (e.g. "Lays Chips", "Digestive Biscuits"). */
+export interface TrackedItem {
+  id: string;
+  name: string;
+  unit: string; // e.g. "packs", "pcs", "bottles"
+  currentQuantity: number;
   createdAt: string;
+  logs: ItemLogEntry[];
 }
