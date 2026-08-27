@@ -8,7 +8,7 @@ import {
   UserProfile,
   FinancialMemory,
   UserAccount,
-  HostelEntry,
+  TrackedItem,
   FinancialAccount,
 } from '../types';
 
@@ -25,7 +25,7 @@ export class FinancialRepository {
   public saveBorrowLend(v: BorrowLendItem[]) { this.storage.saveBorrowLend(v); }
   public saveFixedObligations(v: FixedObligation[]) { this.storage.saveFixedObligations(v); }
   public saveMemories(v: FinancialMemory[]) { this.storage.saveMemories(v); }
-  public saveHostelEntries(v: HostelEntry[]) { this.storage.saveHostelEntries(v); }
+  public saveTrackedItems(v: TrackedItem[]) { this.storage.saveTrackedItems(v); }
   public saveAccounts(v: UserAccount[]) { this.storage.saveAccounts(v); }
   public saveFinancialAccounts(v: FinancialAccount[]) { this.storage.saveFinancialAccounts(v); }
   public saveProfile(v: UserProfile) { this.storage.saveUserProfile(v); }

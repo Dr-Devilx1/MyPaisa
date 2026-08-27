@@ -40,7 +40,7 @@ import {
   FixedObligation,
   FinancialMemory,
   UserAccount,
-  HostelEntry,
+  TrackedItem,
   FinancialAccount,
 } from '../types';
 
@@ -67,7 +67,7 @@ export interface MyPaisaStoreSchema {
   fixedObligations: FixedObligation[];
   memories: FinancialMemory[];
   savedAccounts: UserAccount[];
-  hostelEntries: HostelEntry[];
+  trackedItems: TrackedItem[];
   financialAccounts: FinancialAccount[];
   userProfile: UserProfile;
 }
@@ -107,7 +107,7 @@ const EMPTY_DATA: MyPaisaStoreSchema = {
   fixedObligations: [],
   memories: [],
   savedAccounts: [],
-  hostelEntries: [],
+  trackedItems: [],
   financialAccounts: [],
   userProfile: DEFAULT_PROFILE,
 };
@@ -277,6 +277,31 @@ export function buildDemoData(): MyPaisaStoreSchema {
     { id: 'demo-acc-4', name: 'Cash in Hand', type: 'cash', balance: 3000, createdAt: iso(300) },
   ];
 
+  const trackedItems: TrackedItem[] = [
+    {
+      id: 'demo-item-1',
+      name: 'Lays Chips',
+      unit: 'packs',
+      currentQuantity: 3,
+      createdAt: iso(20),
+      logs: [
+        { id: 'demo-il-2', type: 'consume', quantity: 3, date: iso(5) },
+        { id: 'demo-il-1', type: 'restock', quantity: 6, date: iso(20), cost: 600, notes: 'Bought a box' },
+      ],
+    },
+    {
+      id: 'demo-item-2',
+      name: 'Digestive Biscuits',
+      unit: 'packs',
+      currentQuantity: 1,
+      createdAt: iso(15),
+      logs: [
+        { id: 'demo-il-4', type: 'consume', quantity: 1, date: iso(2) },
+        { id: 'demo-il-3', type: 'restock', quantity: 2, date: iso(15), cost: 280 },
+      ],
+    },
+  ];
+
   return {
     ...EMPTY_DATA,
     transactions,
@@ -285,7 +310,7 @@ export function buildDemoData(): MyPaisaStoreSchema {
     borrowLend,
     fixedObligations,
     memories,
-    hostelEntries: [],
+    trackedItems,
     savedAccounts: [],
     financialAccounts,
     userProfile: { ...DEFAULT_PROFILE, hasCompletedAccountSetup: true },
@@ -561,7 +586,7 @@ export class StorageEngine {
         fixedObligations,
         memories,
         savedAccounts,
-        hostelEntries,
+        trackedItems,
         financialAccounts,
         userProfile,
       ] = await Promise.all([
@@ -572,7 +597,7 @@ export class StorageEngine {
         this.read<FixedObligation[]>('fixedObligations'),
         this.read<FinancialMemory[]>('memories'),
         this.read<UserAccount[]>('savedAccounts'),
-        this.read<HostelEntry[]>('hostelEntries'),
+        this.read<TrackedItem[]>('trackedItems'),
         this.read<FinancialAccount[]>('financialAccounts'),
         this.read<UserProfile>('profile'),
       ]);
@@ -584,7 +609,7 @@ export class StorageEngine {
         (borrowLend && borrowLend.length > 0) ||
         (fixedObligations && fixedObligations.length > 0) ||
         (memories && memories.length > 0) ||
-        (hostelEntries && hostelEntries.length > 0) ||
+        (trackedItems && trackedItems.length > 0) ||
         (financialAccounts && financialAccounts.length > 0) ||
         !!userProfile;
 
@@ -607,7 +632,7 @@ export class StorageEngine {
         fixedObligations: this.asArray(fixedObligations),
         memories: this.asArray(memories),
         savedAccounts: this.asArray(savedAccounts),
-        hostelEntries: this.asArray(hostelEntries),
+        trackedItems: this.asArray(trackedItems),
         financialAccounts: this.asArray(financialAccounts),
         userProfile: { ...DEFAULT_PROFILE, ...(userProfile ?? {}) },
       };
@@ -632,7 +657,7 @@ export class StorageEngine {
     this.saveFixedObligations(data.fixedObligations);
     this.saveMemories(data.memories);
     this.saveAccounts(data.savedAccounts);
-    this.saveHostelEntries(data.hostelEntries);
+    this.saveTrackedItems(data.trackedItems);
     this.saveFinancialAccounts(data.financialAccounts);
     this.saveUserProfile(data.userProfile);
   }
@@ -644,7 +669,7 @@ export class StorageEngine {
   public saveFixedObligations(v: FixedObligation[]) { this.write('fixedObligations', v); }
   public saveMemories(v: FinancialMemory[]) { this.write('memories', v); }
   public saveAccounts(v: UserAccount[]) { this.write('savedAccounts', v); }
-  public saveHostelEntries(v: HostelEntry[]) { this.write('hostelEntries', v); }
+  public saveTrackedItems(v: TrackedItem[]) { this.write('trackedItems', v); }
   public saveFinancialAccounts(v: FinancialAccount[]) { this.write('financialAccounts', v); }
   public saveUserProfile(v: UserProfile) { this.write('profile', v); }
 
@@ -689,7 +714,7 @@ export class StorageEngine {
       ['fixedObligations', (v) => this.saveFixedObligations(v)],
       ['memories', (v) => this.saveMemories(v)],
       ['savedAccounts', (v) => this.saveAccounts(v)],
-      ['hostelEntries', (v) => this.saveHostelEntries(v)],
+      ['trackedItems', (v) => this.saveTrackedItems(v)],
       ['financialAccounts', (v) => this.saveFinancialAccounts(v)],
     ];
 
