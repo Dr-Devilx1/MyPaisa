@@ -14,7 +14,7 @@ import { MemoriesView } from './components/MemoriesView';
 import { AiAssistantView } from './components/AiAssistantView';
 import { AnalyticsView } from './components/AnalyticsView';
 import { SettingsView } from './components/SettingsView';
-import { HostelModeView } from './components/HostelModeView';
+import { ItemTrackerView } from './components/ItemTrackerView';
 import { AuthModal } from './components/AuthModal';
 import { QuickLogModal } from './components/QuickLogModal';
 import { PendingReviewModal } from './components/PendingReviewModal';
@@ -50,8 +50,8 @@ const MainContent: React.FC = () => {
         return <TransactionsView />;
       case 'accounts':
         return <AccountsView />;
-      case 'hostel':
-        return <HostelModeView />;
+      case 'items':
+        return <ItemTrackerView />;
       case 'budgets':
         return <BudgetsView />;
       case 'goals':

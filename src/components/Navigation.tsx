@@ -10,7 +10,7 @@ import {
   BarChart3,
   Trophy,
   Settings,
-  Utensils,
+  Package,
   Menu,
   Plus,
   X,
@@ -41,6 +41,7 @@ export const Navigation: React.FC = () => {
     userProfile,
     updateProfile,
     memories,
+    trackedItems,
     isMobileMenuOpen,
     setIsMobileMenuOpen,
     setIsQuickAddModalOpen,
@@ -59,7 +60,13 @@ export const Navigation: React.FC = () => {
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, description: 'Overview & Net Worth' },
     { id: 'accounts', label: 'Accounts', icon: WalletCards, description: 'Banks, Wallets & Cash' },
     { id: 'transactions', label: 'Transactions', icon: Receipt, description: 'Income & Expense Logs' },
-    { id: 'hostel', label: 'Hostel Mode', icon: Utensils, badge: 'FOOD', description: 'Mess, Tea & Daily Meals' },
+    {
+      id: 'items',
+      label: 'Item Tracker',
+      icon: Package,
+      badge: trackedItems.length > 0 ? `${trackedItems.length}` : undefined,
+      description: 'Snacks & Supplies Stock',
+    },
     {
       id: 'budgets',
       label: 'Budgets',
@@ -85,7 +92,7 @@ export const Navigation: React.FC = () => {
   const mobileBottomItems = [
     { id: 'dashboard', label: 'Home', icon: LayoutDashboard },
     { id: 'transactions', label: 'History', icon: Receipt },
-    { id: 'hostel', label: 'Hostel', icon: Utensils, badge: 'FOOD' },
+    { id: 'items', label: 'Items', icon: Package },
     { id: 'ai_assistant', label: 'AI Pilot', icon: Bot, badge: 'AI' },
   ];
 
@@ -150,13 +157,13 @@ export const Navigation: React.FC = () => {
               </span>
             </div>
             <p className="text-[10px] text-zinc-500 font-medium leading-relaxed">
-              SIHFZ Architecture v2.5 with local PWA storage.
+              SIHFZ Architecture v3.1 with local PWA storage.
             </p>
           </div>
         </div>
       </aside>
 
-      {/* Mobile Bottom Navigation Bar (5 Primary Buttons: Home, History, + Log, Hostel, Menu) */}
+      {/* Mobile Bottom Navigation Bar (5 Primary Buttons: Home, History, + Log, Items, Menu) */}
       <nav className={`mp-bottom-nav mp-safe-bottom fixed bottom-0 left-0 right-0 z-40 flex md:hidden items-center justify-around border-t py-1.5 px-2 backdrop-blur-xl transition-colors ${
         isDark ? 'border-zinc-800/90 bg-[#09090B]/95 text-zinc-300' : 'border-zinc-200 bg-white/95 text-zinc-700 shadow-lg'
       }`}>
@@ -190,7 +197,7 @@ export const Navigation: React.FC = () => {
           <span className="text-[9px] font-extrabold text-amber-500 mt-0.5 uppercase tracking-wider">+ Log</span>
         </button>
 
-        {/* Hostel Mode Tab */}
+        {/* Item Tracker Tab */}
         {mobileBottomItems.slice(2, 3).map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
@@ -389,7 +396,7 @@ export const Navigation: React.FC = () => {
             <div className="mt-auto pt-4 border-t border-zinc-800/60 text-center">
               <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-emerald-500 mb-1">
                 <ShieldCheck className="h-4 w-4" />
-                <span>My Paisa v2.5</span>
+                <span>My Paisa v3.1</span>
               </div>
               <p className="text-[10px] text-zinc-500">
                 Developed by SIHFZ • Progressive Web App

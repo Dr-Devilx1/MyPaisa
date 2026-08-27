@@ -1,30 +1,26 @@
 import React, { useState, useMemo } from 'react';
 import { useFinancials } from '../state/FinancialContext';
-import { TransactionType, TransactionCategory } from '../types';
+import { Transaction } from '../types';
 import {
   Search,
   Plus,
-  Trash2,
   Filter,
   ArrowUpRight,
   ArrowDownRight,
   Users,
-  Calendar,
-  Tag,
-  CreditCard,
   Receipt,
-  X
 } from 'lucide-react';
 import { AddTransactionModal } from './AddTransactionModal';
+import { TransactionDetailModal } from './TransactionDetailModal';
 
 export const TransactionsView: React.FC = () => {
-  const { transactions, deleteTransaction, userProfile } = useFinancials();
+  const { transactions, userProfile } = useFinancials();
 
   const [search, setSearch] = useState('');
   const [selectedType, setSelectedType] = useState<string>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const [detailTx, setDetailTx] = useState<Transaction | null>(null);
 
   const filteredTransactions = useMemo(() => {
     return transactions.filter((tx) => {
@@ -126,9 +122,11 @@ export const TransactionsView: React.FC = () => {
         ) : (
           <div className="divide-y divide-zinc-800/80">
             {filteredTransactions.map((tx) => (
-              <div
+              <button
+                type="button"
                 key={tx.id}
-                className="flex items-center justify-between p-4 hover:bg-zinc-900/60 rounded-2xl transition-all group"
+                onClick={() => setDetailTx(tx)}
+                className="flex w-full items-center justify-between gap-3 p-4 hover:bg-zinc-900/60 rounded-2xl transition-all text-left"
               >
                 <div className="flex min-w-0 flex-1 items-center gap-3.5">
                   <div
@@ -149,91 +147,26 @@ export const TransactionsView: React.FC = () => {
                     )}
                   </div>
 
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <h4 className="truncate text-sm font-semibold text-white">{tx.title}</h4>
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-400 mt-0.5">
-                      <span className="shrink-0 whitespace-nowrap max-w-full truncate rounded-md bg-zinc-900 border border-zinc-800 px-2 py-0.5 text-[10px] font-mono uppercase tracking-wider text-zinc-300">
-                        {tx.category}
-                      </span>
-                      <span className="flex shrink-0 items-center gap-1 whitespace-nowrap text-[11px] text-zinc-500 font-mono">
-                        <Calendar className="h-3 w-3 shrink-0 text-zinc-500" />
-                        {new Date(tx.date).toLocaleDateString()}
-                      </span>
-                      <span className="flex shrink-0 items-center gap-1 whitespace-nowrap text-[11px] text-zinc-500 font-mono">
-                        <CreditCard className="h-3 w-3 shrink-0 text-zinc-500" />
-                        {tx.paymentMethod}
-                      </span>
-                    </div>
-                    {(tx.baseAmount || tx.taxFeeAmount) && (
-                      <p className="text-[11px] text-zinc-500 mt-1">
-                        {tx.baseAmount ? `${userProfile.currencySymbol}${tx.baseAmount.toLocaleString()} price` : ''}
-                        {tx.baseAmount && tx.taxFeeAmount ? ' + ' : ''}
-                        {tx.taxFeeAmount ? `${userProfile.currencySymbol}${tx.taxFeeAmount.toLocaleString()} tax/fee` : ''}
-                      </p>
-                    )}
-                    {tx.notes && (
-                      <p className="text-[11px] text-zinc-500 mt-1 italic">{tx.notes}</p>
-                    )}
-                    {tx.receiptImage && (
-                      <button
-                        type="button"
-                        onClick={() => setLightboxImage(tx.receiptImage!)}
-                        className="mt-1.5 block"
-                        aria-label="View attached receipt"
-                      >
-                        <img
-                          src={tx.receiptImage}
-                          alt="Receipt"
-                          className="h-10 w-10 rounded-lg border border-zinc-800 object-cover"
-                        />
-                      </button>
-                    )}
+                    <p className="truncate text-[11px] text-zinc-500 mt-0.5">{tx.paymentMethod}</p>
                   </div>
                 </div>
 
-                <div className="flex shrink-0 items-center gap-4">
-                  <div className="text-right">
-                    <span
-                      className={`mp-num block text-base font-semibold ${
-                        tx.type === 'income'
-                          ? 'text-emerald-400'
-                          : tx.type === 'expense'
-                          ? 'text-rose-400'
-                          : 'text-indigo-400'
-                      }`}
-                    >
-                      {tx.type === 'income' ? '+' : '-'}
-                      {userProfile.currencySymbol}
-                      {tx.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                    </span>
-                    {tx.tags && tx.tags.length > 0 && (
-                      <div className="flex gap-1 justify-end mt-1">
-                        {tx.tags.map((tag) => (
-                          <span
-                            key={tag}
-                            className="text-[9px] bg-zinc-900 text-zinc-400 border border-zinc-800 px-1.5 py-0.5 rounded font-mono"
-                          >
-                            #{tag}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      if (window.confirm(`Delete "${tx.title}"? This cannot be undone.`)) {
-                        deleteTransaction(tx.id);
-                      }
-                    }}
-                    title="Delete record"
-                    aria-label={`Delete ${tx.title}`}
-                    className="mp-tap flex shrink-0 items-center justify-center rounded-xl p-2 text-zinc-500 hover:text-rose-400 hover:bg-zinc-800 md:opacity-0 md:group-hover:opacity-100 transition-all"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
+                <span
+                  className={`mp-num shrink-0 text-base font-semibold ${
+                    tx.type === 'income'
+                      ? 'text-emerald-400'
+                      : tx.type === 'expense'
+                      ? 'text-rose-400'
+                      : 'text-indigo-400'
+                  }`}
+                >
+                  {tx.type === 'income' ? '+' : '-'}
+                  {userProfile.currencySymbol}
+                  {tx.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </span>
+              </button>
             ))}
           </div>
         )}
@@ -244,27 +177,7 @@ export const TransactionsView: React.FC = () => {
         onClose={() => setIsAddModalOpen(false)}
       />
 
-      {lightboxImage && (
-        <div
-          className="fixed inset-0 z-[90] flex items-center justify-center bg-black/85 p-6"
-          onClick={() => setLightboxImage(null)}
-        >
-          <button
-            type="button"
-            onClick={() => setLightboxImage(null)}
-            className="mp-tap absolute right-4 top-4 flex items-center justify-center rounded-full bg-zinc-900 text-zinc-300"
-            aria-label="Close"
-          >
-            <X className="h-5 w-5" />
-          </button>
-          <img
-            src={lightboxImage}
-            alt="Receipt"
-            className="max-h-full max-w-full rounded-2xl object-contain"
-            onClick={(e) => e.stopPropagation()}
-          />
-        </div>
-      )}
+      <TransactionDetailModal transaction={detailTx} onClose={() => setDetailTx(null)} />
     </div>
   );
 };
