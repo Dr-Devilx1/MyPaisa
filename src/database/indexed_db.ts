@@ -694,51 +694,70 @@ export class StorageEngine {
    * Restore a backup. Returns a result object rather than a bare boolean so
    * the UI can explain WHY an import failed.
    */
-  public importBackupJSON(jsonStr: string): { ok: boolean; message: string; restored: number } {
+  public async importBackupJSON(
+    jsonStr: string
+  ): Promise<{ ok: boolean; message: string; restored: number; breakdown: Record<string, number> }> {
+    const fail = (message: string) => ({ ok: false, message, restored: 0, breakdown: {} });
+
     let parsed: Record<string, unknown>;
     try {
       parsed = JSON.parse(jsonStr);
     } catch {
-      return { ok: false, message: 'That file is not valid JSON.', restored: 0 };
+      return fail('That file is not valid JSON.');
     }
 
     if (!parsed || typeof parsed !== 'object') {
-      return { ok: false, message: 'Backup file is empty or malformed.', restored: 0 };
+      return fail('Backup file is empty or malformed.');
     }
 
-    const arrays: Array<[string, (v: never[]) => void]> = [
-      ['transactions', (v) => this.saveTransactions(v)],
-      ['budgets', (v) => this.saveBudgets(v)],
-      ['goals', (v) => this.saveGoals(v)],
-      ['borrowLend', (v) => this.saveBorrowLend(v)],
-      ['fixedObligations', (v) => this.saveFixedObligations(v)],
-      ['memories', (v) => this.saveMemories(v)],
-      ['savedAccounts', (v) => this.saveAccounts(v)],
-      ['trackedItems', (v) => this.saveTrackedItems(v)],
-      ['financialAccounts', (v) => this.saveFinancialAccounts(v)],
+    const arrays: Array<[string, string, (v: never[]) => void]> = [
+      ['transactions', 'Transactions', (v) => this.saveTransactions(v)],
+      ['budgets', 'Budgets', (v) => this.saveBudgets(v)],
+      ['goals', 'Goals', (v) => this.saveGoals(v)],
+      ['borrowLend', 'Borrow / lend', (v) => this.saveBorrowLend(v)],
+      ['fixedObligations', 'Fixed bills', (v) => this.saveFixedObligations(v)],
+      ['memories', 'Memories', (v) => this.saveMemories(v)],
+      ['savedAccounts', 'Saved logins', (v) => this.saveAccounts(v)],
+      ['trackedItems', 'Tracked items', (v) => this.saveTrackedItems(v)],
+      ['financialAccounts', 'Banks / wallets', (v) => this.saveFinancialAccounts(v)],
     ];
 
-    let restored = 0;
-    for (const [key, setter] of arrays) {
-      const value = parsed[key];
-      if (Array.isArray(value)) {
-        setter(value as never[]);
-        restored += value.length;
-      }
-    }
-
-    // Accept both the new (`userProfile`) and legacy (`profile`) key names.
+    // A backup that carries none of these keys is some other JSON file; bail
+    // before overwriting anything.
+    const recognised = arrays.some(([key]) => Array.isArray(parsed[key]));
     const profile = (parsed.userProfile ?? parsed.profile) as UserProfile | undefined;
-    if (profile && typeof profile === 'object') {
-      this.saveUserProfile({ ...DEFAULT_PROFILE, ...profile });
+    const hasProfile = Boolean(profile && typeof profile === 'object');
+    if (!recognised && !hasProfile) {
+      return fail('No My Paisa records were found in that file.');
     }
 
-    if (restored === 0 && !profile) {
-      return { ok: false, message: 'No My Paisa records were found in that file.', restored: 0 };
+    let restored = 0;
+    const breakdown: Record<string, number> = {};
+    for (const [key, label, setter] of arrays) {
+      // Replace, never merge: a restore has to leave the device holding exactly
+      // what the file holds, otherwise records deleted before the backup would
+      // reappear on the phone being restored onto.
+      const value = Array.isArray(parsed[key]) ? (parsed[key] as never[]) : ([] as never[]);
+      setter(value);
+      breakdown[label] = value.length;
+      restored += value.length;
+    }
+
+    if (hasProfile) {
+      this.saveUserProfile({ ...DEFAULT_PROFILE, ...(profile as UserProfile) });
     }
 
     this.writeMeta(true);
-    return { ok: true, message: `Restored ${restored} record(s) successfully.`, restored };
+    // Every save above only queues its IndexedDB write. Without this the next
+    // read can still return pre-import data straight out of IndexedDB.
+    await this.flush();
+
+    return {
+      ok: true,
+      message: `Restored ${restored} record(s) successfully.`,
+      restored,
+      breakdown,
+    };
   }
 
   /** Load the optional demo dataset on request (Settings screen). */

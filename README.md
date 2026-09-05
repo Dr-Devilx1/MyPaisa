@@ -4,7 +4,7 @@ Offline-first personal finance manager. React 19 + Vite + Tailwind 4, wrapped
 with Capacitor for Android. Your records never leave the device unless you
 export them yourself.
 
-**Version 3.1.0** — see [`AUDIT.md`](AUDIT.md) for what changed and why.
+**Version 3.2.0** — see [`AUDIT.md`](AUDIT.md) for what changed and why.
 
 ---
 
@@ -121,6 +121,32 @@ SMTP_FROM=
 Note that `server.ts` is **not** part of the APK. On a phone the app uses its
 offline engine, or a user-supplied Gemini key called directly from the
 device; the server is only relevant if you host the web version.
+
+---
+
+## What's new in 3.2.0
+
+- **The phone's back button now works everywhere.** It closes whatever is on
+  top — a photo viewer, then the modal under it, then the drawer — and from
+  any tab it returns to the Dashboard before it will exit the app. `Esc` does
+  the same on desktop.
+- **Updates install over the old app instead of replacing it.** Builds are now
+  signed with a fixed key committed to the repo and carry a real
+  `versionCode`, so a newer APK is recognised as an upgrade and your records
+  survive it. (Upgrading *from* 3.1.0 or earlier still needs one final
+  uninstall — export a backup first. See [`BUILD_APK.md`](BUILD_APK.md).)
+- **Save a backup where you can actually find it.** "Save to Phone" writes to
+  `Documents/MyPaisa`, visible in any file manager; "Choose Location" hands
+  the file to the system share sheet for Drive, WhatsApp or an SD card.
+- **Restores are exact.** Importing replaces every store rather than merging
+  into it, waits for the write to land before reloading the screen, and then
+  says precisely what came back ("Restored 214 record(s): 190 transactions,
+  12 goals, …"). The same file on a second phone reproduces the first.
+- **Several receipt photos per record**, from the camera *or* the gallery,
+  with multi-select. Tap a thumbnail to view it full-screen and page through
+  the rest. Older single-photo records still display.
+
+See [`AUDIT.md`](AUDIT.md) for the full history.
 
 ---
 

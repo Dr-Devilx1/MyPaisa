@@ -148,10 +148,74 @@ if (fs.existsSync(manifestPath)) {
     xml = xml.replace(/(<activity[^>]*android:name="[^"]*MainActivity")/, '$1\n            android:screenOrientation="portrait"');
   }
 
+  // "Save backup to phone" writes into public Documents. Android 10 and below
+  // need this declared; 11+ grants it for Documents implicitly, hence maxSdk.
+  if (!xml.includes('WRITE_EXTERNAL_STORAGE')) {
+    xml = xml.replace(
+      '<application',
+      '<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />\n\n    <application'
+    );
+  }
+
   if (xml !== before) {
     fs.writeFileSync(manifestPath, xml);
-    console.log('[assets] patched AndroidManifest.xml (allowBackup=false, portrait)');
+    console.log('[assets] patched AndroidManifest.xml (allowBackup=false, portrait, storage)');
   }
+}
+
+/* ----------------------- stable signing + app version --------------------- */
+
+/**
+ * Without this, every CI machine generates a fresh ~/.android/debug.keystore,
+ * so each APK is signed by a different key. Android then refuses to install a
+ * new build over the old one, and the only way forward is uninstall — which
+ * takes all of the user's records with it. Signing with a keystore that lives
+ * in the repo makes every build an in-place update.
+ *
+ * This is a *debug* key with the well-known "android" password, exactly like
+ * the AOSP one it replaces: it exists to keep the app identity stable, not to
+ * prove authorship. Play Store distribution would need a real release key in
+ * CI secrets (see the release-apk job in .github/workflows/build-apk.yml).
+ */
+const keystoreSrc = path.join(root, 'android-signing', 'mypaisa-debug.keystore');
+const gradlePath = path.join(root, 'android', 'app', 'build.gradle');
+
+if (fs.existsSync(keystoreSrc) && fs.existsSync(gradlePath)) {
+  fs.copyFileSync(keystoreSrc, path.join(root, 'android', 'app', 'mypaisa-debug.keystore'));
+
+  const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+  const [major = 0, minor = 0, patch = 0] = String(pkg.version).split('.').map(Number);
+  // 3.2.0 -> 30200. Monotonic as long as minor/patch stay under 100.
+  const versionCode = major * 10000 + minor * 100 + patch;
+
+  let gradle = fs.readFileSync(gradlePath, 'utf8');
+  const before = gradle;
+
+  if (!gradle.includes('mypaisa-debug.keystore')) {
+    gradle = gradle.replace(
+      /^android\s*\{/m,
+      `android {
+    signingConfigs {
+        debug {
+            storeFile file('mypaisa-debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
+    }`
+    );
+  }
+
+  gradle = gradle.replace(/versionCode\s+\d+/, `versionCode ${versionCode}`);
+  gradle = gradle.replace(/versionName\s+"[^"]*"/, `versionName "${pkg.version}"`);
+
+  if (gradle !== before) {
+    fs.writeFileSync(gradlePath, gradle);
+    console.log(`[assets] patched build.gradle (fixed debug key, v${pkg.version} / ${versionCode})`);
+  }
+} else if (!fs.existsSync(keystoreSrc)) {
+  console.log('[assets] WARNING: android-signing/mypaisa-debug.keystore is missing — builds will');
+  console.log('[assets]          use a throwaway key and cannot update an installed app in place.');
 }
 
 console.log(`[assets] done — ${copied} image(s) copied into android/app/src/main/res`);

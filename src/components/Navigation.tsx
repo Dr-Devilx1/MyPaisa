@@ -23,6 +23,7 @@ import {
   UserCheck,
   WalletCards
 } from 'lucide-react';
+import { useBackHandler } from '../lib/useBackButton';
 
 interface NavItem {
   id: string;
@@ -51,6 +52,8 @@ export const Navigation: React.FC = () => {
   } = useFinancials();
 
   const isDark = userProfile.themeMode === 'dark';
+
+  useBackHandler(isMobileMenuOpen, () => setIsMobileMenuOpen(false));
 
   // Active notifications count
   const warningBudgetsCount = budgets.filter((b) => b.spentAmount >= b.limitAmount * (b.alertThresholdPercent / 100)).length;
@@ -157,7 +160,7 @@ export const Navigation: React.FC = () => {
               </span>
             </div>
             <p className="text-[10px] text-zinc-500 font-medium leading-relaxed">
-              SIHFZ Architecture v3.1 with local PWA storage.
+              SIHFZ Architecture v3.2 with local PWA storage.
             </p>
           </div>
         </div>
@@ -396,7 +399,7 @@ export const Navigation: React.FC = () => {
             <div className="mt-auto pt-4 border-t border-zinc-800/60 text-center">
               <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-emerald-500 mb-1">
                 <ShieldCheck className="h-4 w-4" />
-                <span>My Paisa v3.1</span>
+                <span>My Paisa v3.2</span>
               </div>
               <p className="text-[10px] text-zinc-500">
                 Developed by SIHFZ • Progressive Web App

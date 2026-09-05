@@ -12,3 +12,8 @@ ios/
 *.jks
 *.keystore
 *.jks.b64
+
+# ...except the shared debug key. It is deliberately public (password
+# "android", same as the AOSP debug key) so every CI build signs identically
+# and installs as an update instead of wiping the user's data.
+!android-signing/mypaisa-debug.keystore

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useFinancials } from '../state/FinancialContext';
 import { Landmark, Smartphone, Wallet, Plus, Trash2, ArrowRight, ArrowLeft, X } from 'lucide-react';
+import { useBackHandler } from '../lib/useBackButton';
 
 type Row = { name: string; balance: string };
 
@@ -22,6 +23,13 @@ export const AccountSetupModal: React.FC = () => {
   const [banks, setBanks] = useState<Row[]>([emptyRow()]);
   const [wallets, setWallets] = useState<Row[]>([emptyRow()]);
   const [cash, setCash] = useState('');
+
+  // Back walks the wizard in reverse; from the first step it does what the
+  // visible "Skip for now" button does, so the phone button is never a dead end.
+  useBackHandler(needsAccountSetup, () => {
+    if (step > 0) setStep((s) => (s - 1) as 0 | 1 | 2);
+    else skipAccountSetup();
+  });
 
   if (!needsAccountSetup) return null;
 

@@ -23,7 +23,6 @@ import {
   AiInsight,
   ChatMessage,
   TransactionType,
-  TransactionCategory,
   MainCategory,
   FinancialAccount,
   FinancialAccountType,
@@ -241,7 +240,9 @@ interface FinancialContextType {
   // Actions - User Profile & Settings
   updateProfile: (updated: Partial<UserProfile>) => void;
   exportBackup: () => Promise<string>;
-  importBackup: (jsonStr: string) => { ok: boolean; message: string; restored: number };
+  importBackup: (
+    jsonStr: string
+  ) => Promise<{ ok: boolean; message: string; restored: number; breakdown: Record<string, number> }>;
 
   // AI Assistant Integration
   aiInsight: AiInsight | null;
@@ -1129,21 +1130,22 @@ export const FinancialProvider: React.FC<{ children: ReactNode }> = ({ children 
    * memories and saved accounts were silently dropped — and returned a bare
    * boolean, so the UI could not say why a restore failed.
    */
-  const importBackup = (jsonStr: string) => {
-    const result = repo.importBackup(jsonStr);
+  const importBackup = async (jsonStr: string) => {
+    // Awaited end to end: the repository flushes its queued writes before
+    // resolving, so this re-read cannot pick up pre-import data.
+    const result = await repo.importBackup(jsonStr);
     if (result.ok) {
-      repo.getInitialData().then((data) => {
-        setTransactions(data.transactions);
-        setBudgets(data.budgets);
-        setGoals(data.goals);
-        setBorrowLend(data.borrowLend);
-        setFixedObligations(data.fixedObligations ?? []);
-        setMemories(data.memories ?? []);
-        setSavedAccounts(data.savedAccounts ?? []);
-        setAccounts(data.financialAccounts ?? []);
-        setTrackedItems(data.trackedItems ?? []);
-        setUserProfile(data.userProfile);
-      });
+      const data = await repo.getInitialData();
+      setTransactions(data.transactions);
+      setBudgets(data.budgets);
+      setGoals(data.goals);
+      setBorrowLend(data.borrowLend);
+      setFixedObligations(data.fixedObligations ?? []);
+      setMemories(data.memories ?? []);
+      setSavedAccounts(data.savedAccounts ?? []);
+      setAccounts(data.financialAccounts ?? []);
+      setTrackedItems(data.trackedItems ?? []);
+      setUserProfile(data.userProfile);
     }
     return result;
   };

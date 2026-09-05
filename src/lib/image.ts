@@ -4,6 +4,18 @@
  * one at full size would make backups huge and slow the whole app down. Capped
  * at 900px on the long edge, which is still sharp enough to re-read a receipt.
  */
+import type { Transaction } from '../types';
+
+/**
+ * Every receipt attached to a transaction, oldest storage format included.
+ * Records written before multi-photo support used a single `receiptImage`
+ * string, so both shapes have to be readable or old receipts would vanish.
+ */
+export function receiptImagesOf(tx: Pick<Transaction, 'receiptImages' | 'receiptImage'>): string[] {
+  if (tx.receiptImages && tx.receiptImages.length > 0) return tx.receiptImages;
+  return tx.receiptImage ? [tx.receiptImage] : [];
+}
+
 export function compressImageFile(file: File, maxDimension = 900, quality = 0.7): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

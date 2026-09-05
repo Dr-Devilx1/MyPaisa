@@ -8,14 +8,14 @@ import {
   ArrowDownLeft,
   HandCoins,
   Landmark,
-  Tag,
   Plus,
   BookmarkCheck,
-  HeartHandshake,
   Camera,
+  Images,
   Receipt,
   ImageOff
 } from 'lucide-react';
+import { useBackHandler } from '../lib/useBackButton';
 
 interface AddTransactionModalProps {
   isOpen: boolean;
@@ -81,24 +81,31 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
   const [baseAmount, setBaseAmount] = useState('');
   const [taxFeeAmount, setTaxFeeAmount] = useState('');
 
-  const [receiptImage, setReceiptImage] = useState('');
+  const [receiptImages, setReceiptImages] = useState<string[]>([]);
   const [imageError, setImageError] = useState('');
   const [isCompressing, setIsCompressing] = useState(false);
 
-  const handlePickImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  useBackHandler(isOpen, onClose);
+
+  /** Handles both the camera capture input and the multi-select browse input. */
+  const handlePickImages = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
     e.target.value = '';
-    if (!file) return;
+    if (files.length === 0) return;
     setImageError('');
     setIsCompressing(true);
     try {
-      const dataUrl = await compressImageFile(file);
-      setReceiptImage(dataUrl);
+      const compressed = await Promise.all(files.map((file) => compressImageFile(file)));
+      setReceiptImages((prev) => [...prev, ...compressed]);
     } catch {
-      setImageError('Could not attach that photo — try a different one.');
+      setImageError('Could not attach one of those photos — try a different file.');
     } finally {
       setIsCompressing(false);
     }
+  };
+
+  const removeImageAt = (index: number) => {
+    setReceiptImages((prev) => prev.filter((_, i) => i !== index));
   };
 
   if (!isOpen) return null;
@@ -163,7 +170,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
       accountId: accountId || undefined,
       baseAmount: Number.isFinite(parsedBase) && parsedBase > 0 ? parsedBase : undefined,
       taxFeeAmount: Number.isFinite(parsedTax) && parsedTax > 0 ? parsedTax : undefined,
-      receiptImage: receiptImage || undefined,
+      receiptImages: receiptImages.length > 0 ? receiptImages : undefined,
       notes,
       tags: tags
         .split(',')
@@ -182,7 +189,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
     setShowTaxBreakdown(false);
     setBaseAmount('');
     setTaxFeeAmount('');
-    setReceiptImage('');
+    setReceiptImages([]);
     setImageError('');
     onClose();
   };
@@ -558,44 +565,75 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
             </div>
           )}
 
-          {/* Bill / receipt photo */}
+          {/* Bill / receipt photos — camera or gallery, as many as needed */}
           <div>
             <label className="text-xs font-medium text-zinc-500 block mb-1">
-              Bill / receipt photo (Optional)
+              Bill / receipt photos (Optional)
             </label>
-            {receiptImage ? (
-              <div className="relative inline-block">
-                <img
-                  src={receiptImage}
-                  alt="Attached receipt"
-                  className="h-28 w-28 rounded-xl border object-cover"
-                  style={{ borderColor: isDark ? '#27272a' : '#e4e4e7' }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setReceiptImage('')}
-                  className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-rose-500 text-white"
-                  aria-label="Remove photo"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
+
+            {receiptImages.length > 0 && (
+              <div className="mb-2 flex flex-wrap gap-2">
+                {receiptImages.map((image, index) => (
+                  <div key={index} className="relative">
+                    <img
+                      src={image}
+                      alt={`Attached receipt ${index + 1}`}
+                      className="h-24 w-24 rounded-xl border object-cover"
+                      style={{ borderColor: isDark ? '#27272a' : '#e4e4e7' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeImageAt(index)}
+                      className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-rose-500 text-white"
+                      aria-label={`Remove photo ${index + 1}`}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
               </div>
-            ) : (
+            )}
+
+            <div className="grid grid-cols-2 gap-2">
+              {/* `capture` asks Android to open the camera straight away. */}
               <label
-                className={`flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed py-4 text-xs font-bold ${
+                className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed py-3.5 text-xs font-bold ${
                   isDark ? 'border-zinc-700 text-zinc-400 hover:border-zinc-500' : 'border-zinc-300 text-zinc-500 hover:border-zinc-400'
                 }`}
               >
-                {isCompressing ? (
-                  <>Attaching…</>
-                ) : (
-                  <>
-                    <Camera className="h-4 w-4" /> Attach a photo of the bill
-                  </>
-                )}
-                <input type="file" accept="image/*" capture="environment" onChange={handlePickImage} className="hidden" disabled={isCompressing} />
+                <Camera className="h-4 w-4" /> {isCompressing ? 'Attaching…' : 'Take photo'}
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handlePickImages}
+                  className="hidden"
+                  disabled={isCompressing}
+                />
               </label>
-            )}
+
+              {/* No `capture` + `multiple` = the gallery / file browser, many at once. */}
+              <label
+                className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed py-3.5 text-xs font-bold ${
+                  isDark ? 'border-zinc-700 text-zinc-400 hover:border-zinc-500' : 'border-zinc-300 text-zinc-500 hover:border-zinc-400'
+                }`}
+              >
+                <Images className="h-4 w-4" /> {isCompressing ? 'Attaching…' : 'Browse gallery'}
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handlePickImages}
+                  className="hidden"
+                  disabled={isCompressing}
+                />
+              </label>
+            </div>
+
+            <p className="mt-1 text-[10px] text-zinc-500">
+              Attach as many pages or items as you need — browse lets you pick several at once.
+            </p>
+
             {imageError && (
               <p className="mt-1 flex items-center gap-1 text-xs font-semibold text-rose-400">
                 <ImageOff className="h-3.5 w-3.5" /> {imageError}

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useFinancials } from '../state/FinancialContext';
-import { Target, Plus, Shield, Laptop, Plane, Trophy, Trash2, ArrowUpRight, ArrowDownLeft, HandCoins } from 'lucide-react';
+import { Target, Plus, Trophy, Trash2, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
 
 export const GoalsView: React.FC = () => {
   const { goals, addGoal, contributeToGoal, withdrawFromGoal, deleteGoal, userProfile } = useFinancials();

@@ -11,6 +11,8 @@ import {
   CreditCard,
   Trash2,
 } from 'lucide-react';
+import { useBackHandler } from '../lib/useBackButton';
+import { receiptImagesOf } from '../lib/image';
 
 interface TransactionDetailModalProps {
   transaction: Transaction | null;
@@ -19,11 +21,15 @@ interface TransactionDetailModalProps {
 
 export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({ transaction, onClose }) => {
   const { deleteTransaction, userProfile } = useFinancials();
-  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+
+  useBackHandler(transaction !== null && lightboxIndex === null, onClose);
+  useBackHandler(lightboxIndex !== null, () => setLightboxIndex(null));
 
   if (!transaction) return null;
   const tx = transaction;
   const isDark = userProfile.themeMode === 'dark';
+  const receipts = receiptImagesOf(tx);
 
   const tone =
     tx.type === 'income' ? 'text-emerald-400' : tx.type === 'expense' ? 'text-rose-400' : 'text-indigo-400';
@@ -131,14 +137,23 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({ 
               </div>
             )}
 
-            {tx.receiptImage && (
-              <button type="button" onClick={() => setLightboxOpen(true)} className="self-start">
-                <img
-                  src={tx.receiptImage}
-                  alt="Receipt"
-                  className="h-20 w-20 rounded-xl border border-zinc-800 object-cover"
-                />
-              </button>
+            {receipts.length > 0 && (
+              <div>
+                <p className="text-[11px] font-bold uppercase mp-text-3 mb-1.5">
+                  Receipt {receipts.length > 1 ? `photos (${receipts.length})` : 'photo'}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {receipts.map((image, index) => (
+                    <button key={index} type="button" onClick={() => setLightboxIndex(index)}>
+                      <img
+                        src={image}
+                        alt={`Receipt ${index + 1}`}
+                        className="h-20 w-20 rounded-xl border border-zinc-800 object-cover"
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
 
@@ -153,25 +168,49 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({ 
         </div>
       </div>
 
-      {lightboxOpen && tx.receiptImage && (
+      {lightboxIndex !== null && receipts[lightboxIndex] && (
         <div
           className="fixed inset-0 z-[95] flex items-center justify-center bg-black/85 p-6"
-          onClick={() => setLightboxOpen(false)}
+          onClick={() => setLightboxIndex(null)}
         >
           <button
             type="button"
-            onClick={() => setLightboxOpen(false)}
+            onClick={() => setLightboxIndex(null)}
             className="mp-tap absolute right-4 top-4 flex items-center justify-center rounded-full bg-zinc-900 text-zinc-300"
             aria-label="Close"
           >
             <X className="h-5 w-5" />
           </button>
           <img
-            src={tx.receiptImage}
-            alt="Receipt"
+            src={receipts[lightboxIndex]}
+            alt={`Receipt ${lightboxIndex + 1}`}
             className="max-h-full max-w-full rounded-2xl object-contain"
             onClick={(e) => e.stopPropagation()}
           />
+          {receipts.length > 1 && (
+            <div
+              className="absolute inset-x-0 bottom-6 flex items-center justify-center gap-3"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                onClick={() => setLightboxIndex((i) => ((i ?? 0) - 1 + receipts.length) % receipts.length)}
+                className="mp-tap rounded-full bg-zinc-900 px-4 py-2 text-xs font-bold text-zinc-300"
+              >
+                Prev
+              </button>
+              <span className="mp-num text-xs font-bold text-zinc-400">
+                {lightboxIndex + 1} / {receipts.length}
+              </span>
+              <button
+                type="button"
+                onClick={() => setLightboxIndex((i) => ((i ?? 0) + 1) % receipts.length)}
+                className="mp-tap rounded-full bg-zinc-900 px-4 py-2 text-xs font-bold text-zinc-300"
+              >
+                Next
+              </button>
+            </div>
+          )}
         </div>
       )}
     </>

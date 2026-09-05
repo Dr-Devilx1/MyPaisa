@@ -54,7 +54,10 @@ export interface Transaction {
   baseAmount?: number;
   /** Tax, delivery fee, service charge etc. included in `amount`. */
   taxFeeAmount?: number;
-  /** Optional photo of the bill/receipt, stored as a compressed data URL. */
+  /** Photos of the bill/receipt, stored as compressed data URLs. */
+  receiptImages?: string[];
+  /** Legacy single-photo field. Still read so older records and backups keep
+   *  showing their receipt; new records only ever write `receiptImages`. */
   receiptImage?: string;
   tags?: string[];
   isPending?: boolean;

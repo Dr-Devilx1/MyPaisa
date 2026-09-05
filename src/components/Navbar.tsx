@@ -42,7 +42,7 @@ export const Navbar: React.FC = () => {
                 My Paisa
               </span>
               <span className="hidden xs:inline-block rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[9px] font-mono font-bold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                v3.1
+                v3.2
               </span>
             </div>
             <p className="hidden sm:block text-[10px] text-zinc-500 font-medium tracking-wide uppercase">

@@ -4,13 +4,11 @@ import {
   Zap,
   ArrowUpRight,
   ArrowDownRight,
-  HeartHandshake,
-  Check,
   X,
-  BellRing,
-  Tag
+  BellRing
 } from 'lucide-react';
 import { MainCategory } from '../types';
+import { useBackHandler } from '../lib/useBackButton';
 
 export const QuickLogModal: React.FC = () => {
   const {
@@ -27,6 +25,8 @@ export const QuickLogModal: React.FC = () => {
   const [category, setCategory] = useState<MainCategory>('Food & Living');
   const [notes, setNotes] = useState('');
   const [toastMessage, setToastMessage] = useState('');
+
+  useBackHandler(isQuickAddModalOpen, () => setIsQuickAddModalOpen(false));
 
   if (!isQuickAddModalOpen) return null;
 

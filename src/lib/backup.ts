@@ -29,7 +29,10 @@
  * ---------------------------------------------------------------------------
  */
 
-export type BackupMethod = 'share' | 'mailto' | 'download' | 'server';
+import { Capacitor } from '@capacitor/core';
+import { Directory, Encoding, Filesystem } from '@capacitor/filesystem';
+
+export type BackupMethod = 'share' | 'mailto' | 'download' | 'server' | 'file';
 
 export interface BackupResult {
   ok: boolean;
@@ -65,6 +68,51 @@ export function downloadBackup(json: string, filename = backupFilename()): Backu
     return { ok: true, method: 'download', message: `Saved ${filename} to your Downloads folder.` };
   } catch (e) {
     return { ok: false, method: 'download', message: `Could not save the file: ${String(e)}` };
+  }
+}
+
+/** True inside the Android/iOS app shell, where the Filesystem plugin exists. */
+export function canSaveToDevice(): boolean {
+  return Capacitor.isNativePlatform();
+}
+
+/** Folder the backup lands in, shown to the user so they can find it later. */
+export const BACKUP_FOLDER = 'Documents/MyPaisa';
+
+/**
+ * Writes the backup into the phone's public Documents/MyPaisa folder, where any
+ * file manager can see it. A browser download goes to a sandbox the user often
+ * cannot browse, which is why restoring on a second phone used to be painful.
+ */
+export async function saveBackupToDevice(
+  json: string,
+  filename = backupFilename()
+): Promise<BackupResult> {
+  if (!canSaveToDevice()) {
+    return downloadBackup(json, filename);
+  }
+  try {
+    // Android 11+ scopes Documents to the app and grants this implicitly; older
+    // versions need the storage permission, and a refusal must not be fatal.
+    await Filesystem.requestPermissions().catch(() => undefined);
+    await Filesystem.writeFile({
+      path: `MyPaisa/${filename}`,
+      data: json,
+      directory: Directory.Documents,
+      encoding: Encoding.UTF8,
+      recursive: true,
+    });
+    return {
+      ok: true,
+      method: 'file',
+      message: `Saved to ${BACKUP_FOLDER}/${filename} — open your file manager to find it.`,
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      method: 'file',
+      message: `Could not write to storage (${String(e)}). Try "Choose location" instead.`,
+    };
   }
 }
 

@@ -1,21 +1,15 @@
 import React, { useState } from 'react';
 import { useFinancials } from '../state/FinancialContext';
 import {
-  Sparkles,
   Trophy,
-  History,
   Calendar,
   Flame,
   Plus,
   Trash2,
-  Heart,
   Laptop,
-  CheckCircle2,
   Award,
-  Zap,
-  Tag
+  Zap
 } from 'lucide-react';
-import { FinancialMemory } from '../types';
 
 export const MemoriesView: React.FC = () => {
   const { memories, addMemory, deleteMemory, userProfile } = useFinancials();

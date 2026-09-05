@@ -2,8 +2,6 @@ import React, { useState, useMemo } from 'react';
 import { useFinancials } from '../state/FinancialContext';
 import {
   BarChart3,
-  TrendingUp,
-  TrendingDown,
   PieChart,
   Wallet,
   ArrowUpRight,
@@ -11,7 +9,6 @@ import {
   Download,
   FileSpreadsheet,
   FileText,
-  Calendar,
   Filter,
   Activity,
   HandCoins,

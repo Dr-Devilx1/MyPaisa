@@ -7,10 +7,10 @@ import {
   Clock,
   ArrowUpRight,
   ArrowDownRight,
-  AlertCircle,
   X,
   Sparkles
 } from 'lucide-react';
+import { useBackHandler } from '../lib/useBackButton';
 
 export const PendingReviewModal: React.FC = () => {
   const {
@@ -21,6 +21,8 @@ export const PendingReviewModal: React.FC = () => {
     setIsPendingReviewOpen,
     userProfile,
   } = useFinancials();
+
+  useBackHandler(isPendingReviewOpen, () => setIsPendingReviewOpen(false));
 
   if (!isPendingReviewOpen) return null;
 

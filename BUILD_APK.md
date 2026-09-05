@@ -108,6 +108,33 @@ locally with `npm run android:release`.
 
 ---
 
+## Updating an installed app without losing your data
+
+From **3.2.0 onward, a new APK installs straight over the old one** and your
+records stay where they are. Every build is signed with
+`android-signing/mypaisa-debug.keystore`, which is committed to the repo, and
+`scripts/apply-android-assets.mjs` stamps a `versionCode` derived from the
+`version` in `package.json`. Android sees the same signature and a higher
+version, so it treats the download as an upgrade.
+
+Before 3.2.0 there was no committed key: CI generated a throwaway
+`~/.android/debug.keystore` on every run, so each APK was signed by a
+different identity, Android refused to install one over another, and the only
+way through was to uninstall — which deleted the data with it.
+
+> **One last uninstall.** Going from 3.1.0 or earlier to 3.2.0 still crosses
+> that signature change, so this upgrade needs it. **Open Settings → Save to
+> Phone and export a backup first**, install 3.2.0, then Settings → Restore
+> Backup. After that, upgrades are in-place.
+
+The committed key is a *debug* key with the well-known password `android` —
+the same posture as the AOSP debug key it replaces. It keeps the app's
+identity stable; it is not a proof of authorship. For Play Store distribution,
+add the four `ANDROID_*` secrets and use the `release-apk` job, which signs
+with a private key that never enters the repo.
+
+---
+
 ## Troubleshooting
 
 | Symptom | Cause / fix |
@@ -116,4 +143,5 @@ locally with `npm run android:release`.
 | `Gradle build failed` on first local run | Gradle downloads ~500 MB on first build. Let it finish; re-run. |
 | App installs but shows a white screen | `dist/` was empty. Run `npx vite build` before `npx cap sync android`. |
 | Icons still show the Capacitor default | Run `node scripts/apply-android-assets.mjs` after `npx cap sync`. |
-| "App not installed" on the phone | An older My Paisa with a different signing key is present. Uninstall it first. |
+| "App not installed" on the phone | A build older than 3.2.0 is present, signed with a different key. Export a backup from Settings, uninstall, install, restore. Only needed once. |
+| Update still asks to uninstall on 3.2.0+ | The APK was built without `android-signing/mypaisa-debug.keystore`. Check the build log for the `[assets] WARNING` line. |

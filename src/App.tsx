@@ -1,5 +1,7 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { App as CapacitorApp } from '@capacitor/app';
 import { useKeyboardInset, useScrollFocusedIntoView } from './lib/useKeyboard';
+import { runTopBackHandler } from './lib/useBackButton';
 import { FinancialProvider, useFinancials } from './state/FinancialContext';
 import { Navbar } from './components/Navbar';
 import { Navigation } from './components/Navigation';
@@ -22,7 +24,7 @@ import { SplashScreen } from './components/SplashScreen';
 import { PinLockScreen } from './components/PinLockScreen';
 
 const MainContent: React.FC = () => {
-  const { activeTab, userProfile, isLoading, isUnlocked } = useFinancials();
+  const { activeTab, setActiveTab, userProfile, isLoading, isUnlocked } = useFinancials();
   const [splashDone, setSplashDone] = useState(false);
 
   // Keeps the bottom nav out of the way of the soft keyboard, and keeps the
@@ -30,6 +32,49 @@ const MainContent: React.FC = () => {
   useKeyboardInset();
   useScrollFocusedIntoView();
   const handleSplashDone = useCallback(() => setSplashDone(true), []);
+
+  /**
+   * Android back button. Order of precedence:
+   *   1. Close whatever dismissible surface is open (see lib/useBackButton.ts).
+   *   2. Step back to the dashboard from any other tab.
+   *   3. Only then actually leave the app.
+   *
+   * Escape is bound to the same routing so the behaviour is testable in a
+   * browser and desktop users get the same "close the top sheet" affordance.
+   */
+  useEffect(() => {
+    const goBack = () => {
+      if (runTopBackHandler()) return true;
+      if (activeTab !== 'dashboard') {
+        setActiveTab('dashboard');
+        return true;
+      }
+      return false;
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') goBack();
+    };
+    window.addEventListener('keydown', onKeyDown);
+
+    let detach: (() => void) | undefined;
+    let cancelled = false;
+    CapacitorApp.addListener('backButton', () => {
+      if (!goBack()) void CapacitorApp.exitApp();
+    })
+      .then((handle) => {
+        if (cancelled) void handle.remove();
+        else detach = () => void handle.remove();
+      })
+      // Not running under Capacitor (plain browser) — Escape still works.
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener('keydown', onKeyDown);
+      detach?.();
+    };
+  }, [activeTab, setActiveTab]);
 
   // The splash covers hydration, so the user never sees an empty dashboard
   // full of zeroes while the database is still being read.

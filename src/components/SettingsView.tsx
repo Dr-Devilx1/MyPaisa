@@ -23,6 +23,7 @@ import {
   CloudDownload,
   ExternalLink,
   Sparkles,
+  FolderDown,
 } from 'lucide-react';
 import { Logo } from './Logo';
 import {
@@ -41,6 +42,9 @@ import {
   downloadBackup,
   backupFilename,
   canShareFiles,
+  canSaveToDevice,
+  saveBackupToDevice,
+  BACKUP_FOLDER,
   daysSince,
 } from '../lib/backup';
 
@@ -58,6 +62,15 @@ const CURRENCIES = [
 ];
 
 type Banner = { tone: 'ok' | 'warn' | 'error'; text: string } | null;
+
+/** Spells out exactly what landed, so a restore can be trusted at a glance. */
+function describeRestore(result: { restored: number; breakdown: Record<string, number> }): string {
+  const parts = Object.entries(result.breakdown)
+    .filter(([, count]) => count > 0)
+    .map(([label, count]) => `${count} ${label.toLowerCase()}`);
+  if (parts.length === 0) return 'Backup restored. It contained no records — only your profile.';
+  return `Restored ${result.restored} record(s): ${parts.join(', ')}.`;
+}
 
 export const SettingsView: React.FC = () => {
   const {
@@ -89,6 +102,7 @@ export const SettingsView: React.FC = () => {
 
   const backupAge = daysSince(userProfile.lastBackupAt);
   const shareSupported = useMemo(() => canShareFiles(), []);
+  const saveToDeviceSupported = useMemo(() => canSaveToDevice(), []);
 
   /* ------------------------------ theme tokens ---------------------------- */
   const card = isDark
@@ -118,6 +132,18 @@ export const SettingsView: React.FC = () => {
     try {
       const json = await exportBackup();
       const res = downloadBackup(json);
+      if (res.ok) markBackedUp();
+      say(res.ok ? 'ok' : 'error', res.message);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleSaveToDevice = async () => {
+    setBusy('save');
+    try {
+      const json = await exportBackup();
+      const res = await saveBackupToDevice(json);
       if (res.ok) markBackedUp();
       say(res.ok ? 'ok' : 'error', res.message);
     } finally {
@@ -167,14 +193,19 @@ export const SettingsView: React.FC = () => {
 
     const reader = new FileReader();
     reader.onerror = () => say('error', 'Could not read that file.');
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       const content = event.target?.result;
       if (typeof content !== 'string') {
         say('error', 'That file could not be read as text.');
         return;
       }
-      const result = importBackup(content);
-      say(result.ok ? 'ok' : 'error', result.message);
+      setBusy('import');
+      try {
+        const result = await importBackup(content);
+        say(result.ok ? 'ok' : 'error', result.ok ? describeRestore(result) : result.message);
+      } finally {
+        setBusy(null);
+      }
     };
     reader.readAsText(file);
 
@@ -322,6 +353,16 @@ export const SettingsView: React.FC = () => {
             works by handing the backup file to your own mail app
             {shareSupported ? ' through the system share sheet, so it arrives as a real attachment.' : '. Your device does not support file sharing, so the file is downloaded and a pre-filled draft opens for you to attach it.'}
           </p>
+          {saveToDeviceSupported && (
+            <p className={`mt-2 text-[11px] font-medium leading-relaxed ${sub}`}>
+              <span className="font-bold">Save to Phone</span> writes the file to{' '}
+              <span className="font-mono">{BACKUP_FOLDER}</span>, where any file manager can find it.
+              To put it somewhere else — Drive, WhatsApp, an SD card — use{' '}
+              <span className="font-bold">Choose Location</span> and pick the app from the share
+              sheet. Restoring that same file on another phone brings back every record exactly as
+              it was.
+            </p>
+          )}
         </div>
 
         <label className={`mb-1 block text-xs font-semibold ${sub}`}>Backup email address</label>
@@ -346,6 +387,18 @@ export const SettingsView: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
+          {saveToDeviceSupported && (
+            <button
+              type="button"
+              onClick={handleSaveToDevice}
+              disabled={busy !== null}
+              className={`flex items-center gap-2 rounded-2xl border px-5 py-3 text-xs font-bold uppercase tracking-wider transition-colors disabled:opacity-50 ${softBtn}`}
+            >
+              <FolderDown className="h-4 w-4 text-emerald-500" />
+              {busy === 'save' ? 'Saving...' : 'Save to Phone'}
+            </button>
+          )}
+
           <button
             type="button"
             onClick={handleShare}
@@ -353,7 +406,7 @@ export const SettingsView: React.FC = () => {
             className={`flex items-center gap-2 rounded-2xl border px-5 py-3 text-xs font-bold uppercase tracking-wider transition-colors disabled:opacity-50 ${softBtn}`}
           >
             <Share2 className="h-4 w-4 text-emerald-500" />
-            {busy === 'share' ? 'Opening...' : 'Share Backup'}
+            {busy === 'share' ? 'Opening...' : saveToDeviceSupported ? 'Choose Location' : 'Share Backup'}
           </button>
 
           <button
@@ -448,8 +501,8 @@ export const SettingsView: React.FC = () => {
                       setGoogleBusy('down');
                       const r = await driveDownload();
                       if (r.json) {
-                        const res = importBackup(r.json);
-                        say(res.ok ? 'ok' : 'error', res.message);
+                        const res = await importBackup(r.json);
+                        say(res.ok ? 'ok' : 'error', res.ok ? describeRestore(res) : res.message);
                       } else {
                         say('error', r.message);
                       }
