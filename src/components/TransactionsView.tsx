@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { AddTransactionModal } from './AddTransactionModal';
 import { TransactionDetailModal } from './TransactionDetailModal';
+import { useBackHandler } from '../lib/useBackButton';
 
 export const TransactionsView: React.FC = () => {
   const { transactions, userProfile } = useFinancials();
@@ -21,6 +22,9 @@ export const TransactionsView: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [detailTx, setDetailTx] = useState<Transaction | null>(null);
+
+  useBackHandler(isAddModalOpen, () => setIsAddModalOpen(false));
+  useBackHandler(detailTx !== null, () => setDetailTx(null));
 
   const filteredTransactions = useMemo(() => {
     return transactions.filter((tx) => {

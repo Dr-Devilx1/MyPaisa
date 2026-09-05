@@ -4,20 +4,17 @@ import {
   User,
   AtSign,
   Mail,
-  Lock,
-  Camera,
   Check,
   ShieldCheck,
   RefreshCw,
   LogOut,
-  Sparkles,
   X,
   UserPlus,
   LogIn,
-
   Send,
   CheckCircle2
 } from 'lucide-react';
+import { useBackHandler } from '../lib/useBackButton';
 
 const PRESET_AVATARS = [
   'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
@@ -52,6 +49,8 @@ export const AuthModal: React.FC = () => {
   const [isOtpSending, setIsOtpSending] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+
+  useBackHandler(isAuthModalOpen, () => setIsAuthModalOpen(false));
 
   if (!isAuthModalOpen) return null;
 
